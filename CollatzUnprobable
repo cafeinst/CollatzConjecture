@@ -1,0 +1,747 @@
+theory Collatz_Unprovable
+  imports Main
+begin
+
+section \<open>Collatz map, iterates, parity vectors\<close>
+
+text \<open>
+  We use the "shortcut" Collatz map:
+  * even step:  n \<mapsto> n div 2
+  * odd step:   n \<mapsto> (3*n + 1) div 2
+  One application of T always halves once (either immediately or after adding 1).
+\<close>
+definition T :: "nat \<Rightarrow> nat" where
+  "T n = (if even n then n div 2 else (3*n + 1) div 2)"
+
+abbreviation Tpow :: "nat \<Rightarrow> nat \<Rightarrow> nat"  ("T\<^sup>_ _" [1000,1000] 1000)
+  where "Tpow k n \<equiv> (T ^^ k) n"
+
+text \<open>
+  The parity vector of length k records the odd/even status of n, T n, ..., T^{k-1} n.
+\<close>
+definition parity_vec :: "nat \<Rightarrow> nat \<Rightarrow> bool list"
+  where "parity_vec n k = map (\<lambda>i. odd (Tpow i n)) [0..<k]"
+
+lemma div2_add_double_even_nat:
+  fixes a d :: nat
+  assumes "even a"
+  shows "(a + 2*d) div 2 = a div 2 + d"
+proof -
+  obtain t where A: "a = 2*t" using assms by (elim evenE)
+  show ?thesis by (simp add: A)
+qed
+
+lemma T_add_pow2_even_nat:
+  assumes "even m"
+  shows   "T (m + q * 2 ^ Suc k) = T m + q * 2 ^ k"
+  using assms by (simp add: T_def)
+
+lemma T_add_pow2_odd_nat:
+  assumes "odd m"
+  shows   "T (m + q * 2 ^ Suc k) = T m + 3 * q * 2 ^ k"
+  using assms by (simp add: T_def)
+
+lemma T_add_pow2_even:
+  assumes "even m"
+  shows   "T (m + q * 2^(Suc k)) = T m + q * 2^k"
+proof -
+  obtain t where M: "m = 2*t" using assms by (elim evenE)
+  have "T (m + q * 2^(Suc k)) = (m + q * 2^(Suc k)) div 2" using assms by (simp add: T_def)
+  also have "... = (2*t + q * 2 * 2^k) div 2" by (simp add: M)
+  also have "... = t + q * 2^k" by simp
+  also have "T m = m div 2" using assms by (simp add: T_def)
+  show ?thesis
+  using M \<open>T m = m div 2\<close> calculation by fastforce
+qed
+
+lemma T_add_pow2_odd:
+  assumes "odd  m"
+  shows   "T (m + q * 2^(Suc k)) = T m + (3*q) * 2^k"
+proof -
+  have Ev: "even (3*m + 1)" using assms by simp
+  have "T (m + q * 2^(Suc k)) = ((3*(m + q * 2^(Suc k)) + 1) div 2)"
+    using assms by (simp add: T_def)
+  also have "... = ((3*m + 1) + (3*q) * 2^(Suc k)) div 2" by simp
+  also have "... = (3*m + 1) div 2 + (3*q) * 2^k"
+    using div2_add_double_even_nat[OF Ev, of "(3*q) * 2^k"]
+    by simp
+  also have "(3*m + 1) div 2 = T m" using assms by (simp add: T_def)
+  finally show ?thesis by simp
+qed
+
+lemma length_parity_vec[simp]: "length (parity_vec n k) = k"
+  by (simp add: parity_vec_def)
+
+section \<open>Affine parameters induced by a parity vector\<close>
+
+text \<open>
+  Consuming the parity vector from right to left, we accumulate parameters (c,s) with:
+    T^k(n) = (3^s * n + c) div 2^k,
+  where s is the number of odd steps among the first k iterates.
+  This fold is injective on fixed length, so the affine "formula" (k,s,c) determines the parity vector.
+\<close>
+
+fun params :: "nat \<Rightarrow> bool list \<Rightarrow> nat \<times> nat" where
+  "params i [] = (0, 0)" |
+  "params i (b # bs) =
+     (let (c,s) = params (Suc i) bs in
+      if b then (3*c + 2^i, Suc s) else (c, s))"
+
+definition params0 :: "bool list \<Rightarrow> nat \<times> nat" where
+  "params0 x = params 0 x"
+
+definition formula_of :: "bool list \<Rightarrow> nat \<times> nat \<times> nat" where
+  "formula_of x = (length x, snd (params0 x), fst (params0 x))"  (* (k,s,c) *)
+
+lemma pow2_dvd_fst_params_Suc:
+  "2 ^ Suc i dvd fst (params (Suc i) zs)"
+proof (induction zs arbitrary: i)
+  case Nil
+  show ?case by simp
+next
+  case (Cons b bs)
+  obtain c s where P: "params (Suc (Suc i)) bs = (c, s)"
+    by (cases "params (Suc (Suc i)) bs") auto
+  from Cons.IH[of "Suc i"] P have IH: "2 ^ Suc (Suc i) dvd c" by simp
+  then obtain t where c_rep: "c = 2 ^ Suc (Suc i) * t"
+    by (auto simp: dvd_def)
+
+  (* Build a witness for 2 ^ Suc i dvd c from the IH witness *)
+  have div_c: "2 ^ Suc i dvd c"
+  proof (unfold dvd_def, intro exI)
+    show "c = 2 ^ Suc i * (2 * t)"
+      by (simp add: c_rep)
+  qed
+
+  with P show ?case
+    by (cases b) simp_all
+qed
+
+lemma mod_drop_left_multiple_nat:
+  fixes m a r :: nat
+  shows "(m * a + r) mod m = r mod m"
+  by (simp add: mod_add_left_eq mod_mult_left_eq)
+
+lemma mod_drop_left_multiple_pow2_suc:
+  fixes i a :: nat
+  shows "(2 ^ Suc i * a + 2 ^ i) mod (2 ^ Suc i) = 2 ^ i"
+  by (simp add: mod_drop_left_multiple_nat)
+     (* uses 2^i < 2^(Suc i) to simplify (2^i) mod (2^(Suc i)) to 2^i *)
+
+lemma mod_drop_left_multiple_twopow_times_two:
+  fixes i k :: nat
+  shows "(k * (2 * 2 ^ i) + 2 ^ i) mod (2 * 2 ^ i) = 2 ^ i"
+  by simp
+
+lemma params_injective_len:
+  assumes "length xs = length ys" and "params i xs = params i ys"
+  shows   "xs = ys"
+  using assms
+proof (induction xs arbitrary: ys i)
+  case Nil
+  then show ?case by (cases ys) auto
+next
+  case (Cons a xs)
+  from Cons.prems(1) obtain b ys' where [simp]: "ys = b # ys'"
+    by (cases ys) auto
+  obtain c s where Pxs: "params (Suc i) xs = (c,s)"
+    by (cases "params (Suc i) xs") auto
+  obtain c' s' where Pys: "params (Suc i) ys' = (c',s')"
+    by (cases "params (Suc i) ys'") auto
+
+  have Eq:
+    "(if a then (3*c + 2^i, Suc s) else (c,s)) =
+     (if b then (3*c' + 2^i, Suc s') else (c',s'))"
+    using Cons.prems(2) Pxs Pys by simp
+
+  have len_tails: "length xs = length ys'" using Cons.prems(1) by simp
+
+  show ?case
+  proof -
+    have "a = b"
+    proof (rule ccontr)
+      assume "a \<noteq> b"
+      then consider (TF) "a" "\<not> b" | (FT) "\<not> a" "b" by auto
+      then show False
+      proof cases
+        case TF
+        (* c and c' are both divisible by 2^(Suc i) *)
+        from pow2_dvd_fst_params_Suc[of i xs] Pxs have div_c:  "2 ^ Suc i dvd c"  by simp
+        from pow2_dvd_fst_params_Suc[of i ys'] Pys have div_c': "2 ^ Suc i dvd c'" by simp
+        let ?M = "2 ^ Suc i"
+
+        obtain t  where c_rep:  "c  = ?M * t"  using div_c  by (auto simp: dvd_def)
+        obtain t' where c'rep: "c' = ?M * t'" using div_c' by (auto simp: dvd_def)
+
+        (* Left side reduces to 2^i mod ?M = 2^i *)
+        have Lmod: "(3 * c + 2 ^ i) mod ?M = 2 ^ i"
+        proof -
+          have "(3 * c + 2 ^ i) mod ?M
+              = ((?M * (3 * t)) + 2 ^ i) mod ?M" by (simp add: c_rep algebra_simps)
+          also have "... = (2 ^ i) mod ?M"
+            by (meson mod_drop_left_multiple_nat)
+          also have "... = 2 ^ i" by simp
+          finally show ?thesis .
+        qed
+
+        have Rmod: "c' mod ?M = 0" by (simp add: c'rep)
+
+        from Eq TF have "(3*c + 2^i, Suc s) = (c', s')" by simp
+        hence "(3*c + 2^i) = c'" by simp
+        hence "(3*c + 2^i) mod ?M = c' mod ?M" by simp
+        hence "2 ^ i = 0" using Lmod Rmod by simp
+        thus False using power_eq_0_iff by fastforce
+      next
+        case FT
+        from pow2_dvd_fst_params_Suc[of i ys'] Pys have div_c': "2 ^ Suc i dvd c'" by simp
+        from pow2_dvd_fst_params_Suc[of i xs]  Pxs have div_c:  "2 ^ Suc i dvd c"  by simp
+        let ?M = "2 ^ Suc i"
+
+        obtain t' where c'rep: "c' = ?M * t'" using div_c' by (auto simp: dvd_def)
+        obtain t  where c_rep:  "c  = ?M * t"  using div_c  by (auto simp: dvd_def)
+
+        have Rmod: "(3 * c' + 2 ^ i) mod ?M = 2 ^ i"
+        proof -
+          have "(3 * c' + 2 ^ i) mod ?M
+              = ((?M * (3 * t')) + 2 ^ i) mod ?M" by (simp add: c'rep algebra_simps)
+          also have "... = (2 ^ i) mod ?M"
+            using mod_drop_left_multiple_nat by blast
+          also have "... = 2 ^ i" by simp
+          finally show ?thesis .
+        qed
+
+        have Lmod: "c mod ?M = 0" by (simp add: c_rep)
+
+        from Eq FT have "(c, s) = (3*c' + 2^i, Suc s')" by simp
+        hence "c = 3*c' + 2^i" by simp
+        hence "c mod ?M = (3*c' + 2^i) mod ?M" by simp
+        hence "0 = 2 ^ i" using Lmod Rmod by simp
+        thus False by (metis not_exp_less_eq_0_int verit_comp_simplify1(2))
+      qed
+    qed
+
+    then have bits_eq: "a = b" by simp
+    from Eq bits_eq have "c = c' \<and> s = s'" by (cases a) auto
+    hence "xs = ys'"
+      using Cons.IH[OF len_tails] Pxs Pys by metis
+    with bits_eq show ?thesis by simp
+  qed
+qed
+
+lemma formula_determines_parity_on_len:
+  assumes "length x = k" "length y = k" "formula_of x = formula_of y"
+  shows   "x = y"
+proof -
+  from assms(3) have "snd (params0 x) = snd (params0 y)" "fst (params0 x) = fst (params0 y)"
+    by (auto simp: formula_of_def)
+  hence "params0 x = params0 y" by (cases "params0 x"; cases "params0 y"; simp)
+  thus ?thesis
+    using assms(1,2) params_injective_len[of x y 0]
+    by (simp add: params0_def)
+qed
+
+section \<open>A 2-adic invariance lemma (crucial for construction)\<close>
+
+text \<open>
+  If two naturals differ by a multiple of 2^k, they have the same first k parity bits.
+  Intuition: equal mod 2 \<Rightarrow> same parity; after applying T once, the difference
+  remains a multiple of 2^{k-1}, so we can iterate.
+\<close>
+
+text \<open>
+  Adding any multiple of \<^term>\<open>2^k\<close> to \<^term>\<open>m\<close> keeps the first \<^term>\<open>k\<close> parities
+  of the Collatz iterates unchanged.
+\<close>
+
+lemma map_upt_Cons_Suc:
+  "map f [0..<Suc k] = f 0 # map (\<lambda>i. f (Suc i)) [0..<k]"
+proof -
+  have "[0..<Suc k] = 0 # [1..<Suc k]"
+    by (simp add: upt_conv_Cons)
+  also have "... = 0 # map Suc [0..<k]"
+    by (simp add: map_Suc_upt)
+  finally show ?thesis by simp
+qed
+
+lemma map_upt_Cons_Suc':
+  "map f [0..<Suc k] = f 0 # map (\<lambda>i. f (Suc i)) [0..<k]"
+proof -
+  have "map f [0..<Suc k] = f 0 # map f [Suc 0..<Suc k]"
+    by (metis list.simps(9) upt_conv_Cons zero_less_Suc)
+  also have "... = f 0 # map (\<lambda>i. f (Suc i)) [0..<k]"
+    by (metis calculation map_upt_Cons_Suc)
+  finally show ?thesis .
+qed
+
+lemma funpow_Suc_left:
+  "(f ^^ Suc n) x = f ((f ^^ n) x)"
+  by (induction n) simp_all
+
+lemma funpow_Suc_right:
+  "(f ^^ Suc n) x = (f ^^ n) (f x)"
+  by (induction n) simp_all
+
+lemma parity_vec_Suc:
+  "parity_vec n (Suc k) = odd n # parity_vec (T n) k"
+proof -
+  have "parity_vec n (Suc k) = map (\<lambda>i. odd ((T ^^ i) n)) [0..<Suc k]"
+    by (simp add: parity_vec_def)
+  also have "... = odd n # map (\<lambda>i. odd ((T ^^ i) n)) [Suc 0..<Suc k]"
+    proof -
+      show ?thesis
+        by (smt (z3) Cons_eq_map_conv funpow_0 upt_conv_Cons zero_less_Suc)
+    qed 
+  also have "... = odd n # map (\<lambda>i. odd ((T ^^ Suc i) n)) [0..<k]"
+    using map_upt_Cons_Suc by simp
+  also have "... = odd n # map (\<lambda>i. odd ((T ^^ i) (T n))) [0..<k]"
+    using funpow_Suc_right by metis
+  also have "... = odd n # parity_vec (T n) k"
+    by (simp add: parity_vec_def)
+  finally show ?thesis .
+qed
+
+lemma parity_vec_add_pow2_invariant:
+  fixes m q k :: nat
+  shows "parity_vec (m + q * 2 ^ k) k = parity_vec m k"
+proof (induction k arbitrary: m q)
+  case 0
+  show ?case by (simp add: parity_vec_def)
+next
+  case (Suc k)
+  let ?\<Delta> = "q * 2 ^ Suc k"
+
+  (* HEAD parity is unchanged: ?\<Delta> is even *)
+  have head: "odd (m + ?\<Delta>) = odd m"
+    by simp
+
+  (* TAIL parity-vector is invariant after one T-step *)
+  have tail: "parity_vec (T (m + ?\<Delta>)) k = parity_vec (T m) k"
+  proof (cases "even m")
+    case True
+    then obtain t where m2: "m = 2*t" by (elim evenE)
+    have "(m + ?\<Delta>) div 2 = t + q * 2 ^ k"
+      by (simp add: m2)
+    hence "T (m + ?\<Delta>) = t + q * 2 ^ k"
+      using True by (simp add: T_def)
+    moreover have "T m = t"
+      using True m2 by (simp add: T_def)
+    ultimately show ?thesis
+      using Suc.IH[of t q] by simp
+  next
+    case False
+    then obtain t where m2: "m = 2*t + 1" by (elim oddE)
+    have "(3*(m + ?\<Delta>) + 1) div 2
+          = (3*m + 1) div 2 + (3*q) * 2 ^ k"
+    proof -
+      have "3*(m + ?\<Delta>) + 1 = (3*m + 1) + (3*q) * 2 ^ Suc k"
+        by simp
+      moreover have "even (3*m + 1)"
+        using False m2 by simp
+      ultimately show ?thesis by simp
+    qed
+    hence "T (m + ?\<Delta>) = T m + (3*q) * 2 ^ k"
+      using False by (simp add: T_def)
+    thus ?thesis
+      using Suc.IH[of "T m" "3*q"] by simp
+  qed
+  (* expose the [head | tail] shape on both sides *)
+  have step1: "parity_vec (m + ?\<Delta>) (Suc k)
+             = odd (m + ?\<Delta>) # parity_vec (T (m + ?\<Delta>)) k"
+    by (simp add: parity_vec_Suc)
+  also have step2: "... = odd m # parity_vec (T m) k"
+    using head tail by blast
+  also have step3: "... = parity_vec m (Suc k)"
+    by (simp add: parity_vec_Suc)
+  finally show ?case .
+qed
+
+section \<open>Realising any finite parity vector\<close>
+
+text \<open>
+  We now construct, for any bit-list \<open>x\<close> of length \<open>k\<close>, a natural \<open>n\<close> whose first \<open>k\<close>
+  parities (under iterates of \<open>T\<close>) equal \<open>x\<close>.
+
+  The only delicate step is when the leading bit we want is \<open>True\<close> (odd): we need a predecessor
+  of the form \<open>n = (2*m - 1) div 3\<close>, which is an integer **iff** \<open>m \<equiv> 2 (mod 3)\<close>.
+  To guarantee that while keeping the suffix parities fixed, we take the suffix witness \<open>m₀\<close> and
+  adjust it to \<open>m = m₀ + t \<cdot> 2^ℓ\<close>, where \<open>ℓ = length bs\<close> and \<open>t \<in> {0,1,2}\<close> is chosen so
+  that \<open>m \<equiv> 2 (mod 3)\<close>. The lemma above ensures this adjustment does **not** change the first
+  \<open>ℓ\<close> parities of \<open>m\<close>.
+\<close>
+lemma power_mod_nat:
+  fixes a m n :: nat
+  shows "(a ^ n) mod m = ((a mod m) ^ n) mod m"
+proof (induction n)
+  case 0
+  show ?case by simp
+next
+  case (Suc n)
+  have "(a ^ Suc n) mod m = (a * a ^ n) mod m" by simp
+  also have "... = (((a mod m) * a ^ n) mod m)"
+    by (simp add: mod_mult_left_eq)
+  also have "... = (((a mod m) * ((a ^ n) mod m)) mod m)"
+    by (simp add: mod_mult_right_eq)
+  also have "... = (((a mod m) * (((a mod m) ^ n) mod m)) mod m)"
+    by (simp add: Suc.IH)
+  also have "... = (((a mod m) * ((a mod m) ^ n)) mod m)"
+    by (simp add: mod_mult_right_eq)
+  also have "... = ((a mod m) ^ Suc n) mod m" by simp
+  finally show ?case .
+qed
+
+lemma power_mult_nat:
+  fixes a :: nat
+  shows "a ^ (m * n) = (a ^ m) ^ n"
+proof (induction n)
+  case 0
+  show ?case by simp
+next
+  case (Suc n)
+  have "a ^ (m * Suc n) = a ^ (m*n + m)" by (simp add: add.commute)
+  also have "... = a ^ (m*n) * a ^ m" by (simp add: power_add)
+  also have "... = (a ^ m) ^ n * a ^ m" by (simp add: Suc.IH)
+  also have "... = (a ^ m) ^ Suc n" by simp
+  finally show ?case .
+qed
+
+lemma pow4_mod3: "((4::nat) ^ m) mod 3 = 1"
+  by (simp add: power_mod_nat)
+
+(* 2. Even exponent: 2^(2m) = (2^2)^m = 4^m *)
+lemma pow2_mod3_even:
+  assumes "even l"
+  shows "2 ^ l mod 3 = 1"
+proof -
+  obtain m where L: "l = 2*m" using assms by (erule evenE)
+  have "2 ^ l mod 3 = (2 ^ (2*m)) mod 3" by (simp add: L)
+  also have "... = (((2::nat) ^ 2) ^ m) mod 3" by (simp add: power_mult_nat)
+  also have "... = (4 ^ m) mod 3" by simp
+  also have "... = 1" by (rule pow4_mod3)
+  show ?thesis by simp
+qed
+
+(* 3. Odd exponent: 2^(2m+1) = 2 * 4^m *)
+lemma pow2_mod3_odd:
+  assumes "odd l"
+  shows "2 ^ l mod 3 = 2"
+proof -
+  obtain m where L: "l = Suc (2*m)" using assms by (metis Suc_eq_plus1 oddE)
+  have "2 ^ l mod 3 = (2 * 2 ^ (2*m)) mod 3" by (simp add: L)
+  also have "... = (2 * (((2::nat) ^ 2) ^ m)) mod 3"
+    by (simp add: power_mult_nat)
+  also have "... = (2 * ((4 ^ m) mod 3)) mod 3"
+    by (simp add: mod_mult_right_eq)
+  also have "... = (2 * 1) mod 3" by (simp add: pow4_mod3)
+  also have "... = 2" by simp
+  show ?thesis by simp
+qed
+
+(* Final combined statement *)
+lemma pow2_mod3:
+  fixes l :: nat
+  shows "2 ^ l mod 3 = (if even l then 1 else 2)"
+  by (cases "even l") (simp add: pow2_mod3_even, simp add: pow2_mod3_odd)
+
+lemma parity_vector_realisable: 
+  fixes x :: "bool list" 
+  shows "\<exists>n. parity_vec n (length x) = x" 
+proof (induction x) 
+  case Nil 
+  show ?case 
+    by (metis length_0_conv length_parity_vec) 
+next case (Cons b bs) 
+  obtain m0 
+    where IH: "parity_vec m0 (length bs) = bs" 
+    using Cons.IH 
+    by blast 
+  consider (even) "\<not> b" | (odd) "b" 
+    by auto 
+  then show ?case 
+  proof cases 
+    case even 
+    let ?n = "2*m0" 
+    have tail_ok: "parity_vec (T (2*m0)) (length bs) = bs"
+      using IH by (simp add: T_def)   (* because T(2*m0) = m0 *)
+    have head: "odd (2*m0) = False" by simp
+    have "parity_vec (2*m0) (Suc (length bs))
+        = odd (2*m0) # parity_vec (T (2*m0)) (length bs)"
+    by (simp add: parity_vec_Suc)
+    also have "... = False # bs" by (simp add: head tail_ok)
+    finally show ?thesis using even by auto
+next 
+  case odd 
+  let ?l = "length bs" 
+  let ?p = "2 ^ ?l mod 3" 
+  let ?r = "m0 mod 3" 
+  define t 
+    where "t = (if ?p = 1 then (2 + (3 - ?r)) mod 3 else ((2 + (3 - ?r)) * 2) mod 3)" 
+  have target_mod3: "(m0 + t * 2 ^ ?l) mod 3 = 2" 
+  proof - 
+    have p12: "?p = 1 \<or> ?p = 2" 
+      using pow2_mod3[of ?l] 
+      by metis 
+    show ?thesis 
+    proof (cases "?p = 1") 
+      case True 
+      hence "((?r + t * ?p) mod 3) = 2" 
+        by simp
+      thus ?thesis by simp
+    next case False with p12 
+      have P2: "?p = 2" by auto 
+      hence "((?r + t * ?p) mod 3) = 2" 
+        by (simp add: t_def mod_add_eq mod_mult_right_eq) 
+      thus ?thesis 
+        using P2 mod_add_eq mod_mult_right_eq by (metis div_mod_decomp mod_mult_self3)
+    qed 
+  qed 
+  let ?m = "m0 + t * 2 ^ ?l" 
+  have tail_preserved: "parity_vec ?m ?l = bs" 
+    using IH parity_vec_add_pow2_invariant[of m0 t ?l] 
+    by simp 
+  obtain q 
+    where m_eq: "?m = 3*q + 2" 
+    using target_mod3 
+    by (metis mod_eqD) 
+  let ?n = "(2 * ?m - 1) div 3" 
+  have head: "odd ?n" 
+    by (simp add: m_eq) 
+  have tail_step: "parity_vec (T ?n) ?l = bs" 
+    using tail_preserved 
+    by (simp add: m_eq T_def) 
+  have "parity_vec ?n (Suc ?l) = odd ?n # parity_vec (T ?n) ?l" 
+    by (simp add: parity_vec_def) 
+  also have "... = True # bs" 
+    using head tail_step 
+    by simp 
+  finally show ?thesis 
+    by (intro exI[of _ ?n]) simp 
+  qed
+qed
+
+section \<open>Encoding choice and the “formula \<Rightarrow> parity” lemma (derived, not assumed)\<close>
+
+text \<open>
+  We model “contains” as the substring relation on bitstrings (lists of booleans).
+  For the encoding, we **choose** \<open>enc_parity = id\<close> (i.e., parity bits are written verbatim),
+  and require that the encoding of the formula starts with those bits as a prefix.
+  With that design choice, “contains the formula” \<Rightarrow> “contains the parity vector” is immediate.
+\<close>
+
+type_synonym bit = bool
+type_synonym bitstring = "bit list"
+
+definition contains :: "bitstring \<Rightarrow> bitstring \<Rightarrow> bool"  (infix "\<sqsupset>" 50)
+  where "p \<sqsupset> s \<longleftrightarrow> (\<exists>u v. p = u @ s @ v)"
+
+locale Proof_Contains_Formula =
+  fixes is_proof     :: "bitstring \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool"
+  and   enc_formula  :: "nat \<times> nat \<times> nat \<Rightarrow> bitstring"
+  and   enc_parity   :: "bool list \<Rightarrow> bitstring"
+  assumes enc_parity_is_id: "enc_parity = id"
+  assumes must_contain_formula:
+    "is_proof p k n \<Longrightarrow> p \<sqsupset> enc_formula (formula_of (parity_vec n k))"
+  assumes enc_formula_prefix:
+    "\<exists>rest. enc_formula (formula_of x) = enc_parity x @ rest"
+begin
+
+text \<open>
+  Since \<open>enc_parity = id\<close> and \<open>enc_formula\<close> has \<open>enc_parity x\<close> as a prefix,
+  any proof that “contains the formula” necessarily contains the parity bits.
+\<close>
+lemma contains_formula_imp_contains_parity:
+  assumes "p \<sqsupset> enc_formula (formula_of x)"
+  shows   "p \<sqsupset> enc_parity x"
+proof -
+  obtain rest where F: "enc_formula (formula_of x) = enc_parity x @ rest"
+    using enc_formula_prefix by blast
+  show ?thesis
+    unfolding contains_def using Collatz_Unprovable.contains_def F assms by auto 
+qed
+
+end
+
+section \<open>Random strings interface (minimal AIT counting facts)\<close>
+
+locale Random_Strings =
+  fixes random :: "nat \<Rightarrow> bitstring \<Rightarrow> bool"
+  assumes random_length: "random m s \<Longrightarrow> length s = m"
+  assumes many_random:   "card {s. length s = m \<and> random m s} \<ge> 2 ^ (m - 1)"
+  assumes random_incompressible:
+    "\<lbrakk> random m s; p \<sqsupset> s \<rbrakk> \<Longrightarrow> length p \<ge> m"
+begin end
+
+section \<open>Universal proof contradiction under your paper’s assumption\<close>
+
+definition proof_len :: "bitstring \<Rightarrow> nat" where "proof_len p = length p"
+
+definition collatz_cofinal_proof ::
+  "(bitstring \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool) \<Rightarrow> bitstring \<Rightarrow> bool" where
+  "collatz_cofinal_proof is_proof p \<longleftrightarrow> (\<forall>n L. \<exists>k\<ge>L. is_proof p k n)"
+
+definition collatz_pointwise_proof ::
+  "(bitstring \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool) \<Rightarrow> bitstring \<Rightarrow> bool" where
+  "collatz_pointwise_proof is_proof p \<longleftrightarrow> (\<forall>n. \<exists>k. is_proof p k n)"
+
+(* Combined locale: inherits all fixes/assumptions from both *)
+locale Proof_Contains_Formula_Random =
+  Proof_Contains_Formula is_proof enc_formula enc_parity +
+  Random_Strings random
+  for is_proof :: "bitstring \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool"
+  and enc_formula :: "nat \<times> nat \<times> nat \<Rightarrow> bitstring"
+  and enc_parity :: "bool list \<Rightarrow> bitstring"
+  and random :: "nat \<Rightarrow> bitstring \<Rightarrow> bool"
+  +
+  assumes is_proof_plus2: "\<forall>p n k. is_proof p k n \<longrightarrow> is_proof p (k+2) n"
+
+context Proof_Contains_Formula_Random
+begin
+
+lemma contains_prefixI: "p \<sqsupset> (x @ y) \<Longrightarrow> p \<sqsupset> x"
+  by (auto simp: contains_def)
+
+lemma parity_vec_prefix:
+  assumes "k0 \<le> k"
+  shows "\<exists>rest. parity_vec n k = parity_vec n k0 @ rest"
+proof (intro exI, rule nth_equalityI)
+  show "length (parity_vec n k) = length (parity_vec n k0 @ drop k0 (parity_vec n k))"
+    by (simp add: assms)
+  fix i assume "i < length (parity_vec n k)"
+  then show "parity_vec n k ! i = (parity_vec n k0 @ drop k0 (parity_vec n k)) ! i"
+  proof (cases "i < k0")
+    case True
+    then show ?thesis
+      using assms True parity_vec_def nth_map nth_upt by simp
+  next
+    case False
+    then obtain j where "i = k0 + j" by (meson le_iff_add linorder_le_less_linear)
+    with False show ?thesis
+      using parity_vec_def nth_map nth_upt by simp
+  qed
+qed
+
+lemma no_finite_cofinal_proof:
+  assumes U: "collatz_cofinal_proof is_proof p"
+  shows False
+proof -
+  let ?L = "proof_len p"
+  let ?S = "{s::bitstring. length s = Suc ?L \<and> random (Suc ?L) s}"
+
+  have finS: "finite ?S"
+    by (rule finite_subset[of ?S "{s. length s = Suc ?L}"]) (auto simp: finite_lists_length_eq)
+
+  from many_random[of "Suc ?L"] have "card ?S \<ge> 2 ^ ?L" by simp
+  hence "?S \<noteq> {}"
+    by (cases "?S") auto
+
+  then obtain s where sLen: "length s = Suc ?L" and sRand: "random (Suc ?L) s" by auto
+
+  obtain n where npar: "parity_vec n (length s) = s"
+    using parity_vector_realisable by blast
+  define L where "L = length s"
+
+  (* cofinal: get some k \<ge> L with is_proof p k n *)
+  obtain k where k_ge: "k \<ge> L" and kpf: "is_proof p k n"
+    using U unfolding collatz_cofinal_proof_def L_def by blast
+
+  have has_formula: "p \<sqsupset> enc_formula (formula_of (parity_vec n k))"
+    using kpf must_contain_formula by blast
+  hence has_parity: "p \<sqsupset> enc_parity (parity_vec n k)"
+    by (rule contains_formula_imp_contains_parity)
+
+  from enc_parity_is_id have EP: "enc_parity = id" by simp
+  obtain rest where pv_split: "parity_vec n k = parity_vec n L @ rest"
+    using parity_vec_prefix[OF k_ge] by blast
+  hence "enc_parity (parity_vec n k) = s @ rest"
+    using npar EP L_def by simp
+
+  have "p \<sqsupset> s"
+    using has_parity \<open>enc_parity (parity_vec n k) = s @ rest\<close>
+    by (metis contains_prefixI)
+
+  then show False
+    using random_incompressible[OF sRand] by (metis Suc_n_not_le_n proof_len_def)
+qed
+
+lemma T_on_1_2[simp]: "T 1 = 2" "T 2 = 1"
+  by (simp_all add: T_def)
+
+lemma hits_one_cofinal:
+  assumes "Tpow k n = 1"
+  shows   "Tpow (k + 2*t) n = 1"  "Tpow (k + 2*t + 1) n = 2"
+proof -
+  have step2: "Tpow (k+2) n = 1"
+    using assms T_on_1_2(1) by auto
+  have stepS: "\<And>t. Tpow (k + 2*t) n = 1 \<Longrightarrow> Tpow (k + 2*(Suc t)) n = 1"
+    using T_on_1_2(1) by force
+  show "Tpow (k + 2*t) n = 1"
+    using step2 assms by (induction t) (simp_all add: funpow_add)
+  then show "Tpow (k + 2*t + 1) n = 2"
+    by (metis Suc_eq_plus1 T_on_1_2(1) funpow_Suc_left)
+qed
+
+lemma truth_cofinal:
+  assumes "\<exists>k. Tpow k n = 1"
+  shows "\<forall>L. \<exists>k\<ge>L. Tpow k n = 1"
+proof
+  fix L obtain k0 where "Tpow k0 n = 1" using assms by auto
+  let ?t = "(L - k0 + 1) div 2"
+  have "k0 + 2*?t \<ge> L" by arith
+  thus "\<exists>k\<ge>L. Tpow k n = 1"
+    using hits_one_cofinal(1)[OF \<open>Tpow k0 n = 1\<close>] by blast
+qed
+
+lemma pointwise_implies_cofinal:
+  assumes P: "\<forall>n. \<exists>k. is_proof p k n"
+  assumes C: "\<forall>n k. is_proof p k n \<longrightarrow> is_proof p (k + 2) n"
+  shows "\<forall>n L. \<exists>k\<ge>L. is_proof p k n"
+proof (intro allI)
+  fix n L
+  obtain k0 where k0: "is_proof p k0 n" using P by blast
+
+  (* Specialize the +2-closure to this n *)
+  have Cn: "\<And>k. is_proof p k n \<Longrightarrow> is_proof p (k + 2) n"
+    using C by blast
+
+  (* Closure under adding an even offset *)
+  have step: "\<And>t. is_proof p (k0 + 2 * t) n"
+  proof-
+    fix t
+    show "is_proof p (k0 + 2 * t) n"
+    proof (induction t)
+      case 0
+      show ?case by (simp add: k0)
+    next
+      case (Suc t)
+      from Cn[OF Suc.IH] have "is_proof p ((k0 + 2 * t) + 2) n" .
+      thus ?case by simp
+    qed
+  qed
+
+  let ?t = "(L - k0 + 1) div 2"
+  have ge: "k0 + 2 * ?t \<ge> L" by arith
+  with step show "\<exists>k\<ge>L. is_proof p k n" by blast
+qed
+
+lemma pointwise_implies_cofinal_global:
+  assumes Pp: "collatz_pointwise_proof is_proof p"
+  shows "collatz_cofinal_proof is_proof p"
+proof -
+  have C: "\<forall>n k. is_proof p k n \<longrightarrow> is_proof p (k+2) n"
+    using is_proof_plus2 by blast
+  show ?thesis
+    unfolding collatz_pointwise_proof_def collatz_cofinal_proof_def
+    using pointwise_implies_cofinal[OF _ C] Pp by (simp add: collatz_pointwise_proof_def)
+qed
+
+theorem no_finite_pointwise_proof:
+  assumes Pp: "collatz_pointwise_proof is_proof p"
+  shows False
+proof -
+  have Cof: "collatz_cofinal_proof is_proof p"
+    using pointwise_implies_cofinal_global[OF Pp] .
+  show False
+    using no_finite_cofinal_proof[OF Cof] .
+qed
+
+end
+end
