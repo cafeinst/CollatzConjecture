@@ -565,31 +565,25 @@ type_synonym bitstring = "bit list"
 definition contains :: "bitstring ⇒ bitstring ⇒ bool"  (infix "⊐" 50)
   where "p ⊐ s ⟷ (∃u v. p = u @ s @ v)"
 
-section ‹Random strings interface (minimal AIT counting facts)›
-
 lemma contains_len_bound: "p ⊐ s ⟹ length s ≤ length p"
   by (auto simp: contains_def)
 
 lemma finite_bitstrings_of_len:
   "finite {s::bitstring. length s = m}"
 proof -
-  (* First show the standard finite-criterion for lists over a finite alphabet *)
   have fin_aux:
     "finite {s::bool list. set s ⊆ (UNIV::bool set) ∧ length s = m}"
     by (rule finite_lists_length_eq) simp
-  (* Now simplify the guard set s ⊆ UNIV away *)
   have "{s::bitstring. length s = m}
         = {s. set s ⊆ (UNIV::bool set) ∧ length s = m}"
     by auto
-  then show ?thesis
-    using fin_aux by (simp only:)
+  then show ?thesis using fin_aux by (simp only:)
 qed
 
 lemma finite_bitstrings_le_len:
   "finite {s::bitstring. length s ≤ m}"
 proof (induction m)
-  case 0
-  show ?case by (simp add: finite_bitstrings_of_len)
+  case 0 show ?case by (simp add: finite_bitstrings_of_len)
 next
   case (Suc m)
   have "{s::bitstring. length s ≤ Suc m}
@@ -602,78 +596,99 @@ lemma finite_substrings_of:
 proof -
   have "{s::bitstring. p ⊐ s} ⊆ {s. length s ≤ length p}"
     using contains_len_bound by auto
-  thus ?thesis by (simp add: finite_bitstrings_le_len finite_subset)
+  then show ?thesis
+    by (rule finite_subset[OF finite_bitstrings_le_len]) simp
 qed
 
-(* New, minimal locale: encode the actual instance (n,k) *)
-locale ProofsContainStatements_Min =
-  fixes is_proof :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
-  and   enc_stmt :: "nat ⇒ nat ⇒ bitstring"  (* code for the statement “T^k(n) = 1” *)
-  assumes must_contain_stmt:
-    "is_proof p k n ⟹ p ⊐ enc_stmt n k"
-  assumes enc_stmt_inj:
-    "enc_stmt n1 k1 = enc_stmt n2 k2 ⟹ n1 = n2 ∧ k1 = k2"
+text ‹Encode formulas so that the parity vector appears as a prefix.›
+definition enc_parity :: "bitstring ⇒ bitstring" where
+  "enc_parity = id"
+
+lemma enc_parity_is_id[simp]: "enc_parity x = x"
+  by (simp add: enc_parity_def)
+
+locale ProofsContainFormulas_Min =
+  fixes is_proof    :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
+  and   enc_formula :: "nat × nat × nat ⇒ bitstring"
+  assumes must_contain_formula:
+    "is_proof p k n ⟹ p ⊐ enc_formula (formula_of (parity_vec n k))"
+  assumes enc_formula_prefix:
+    "∃rest. enc_formula (formula_of x) = enc_parity x @ rest" for x
+  assumes encodings_distinct_in_k:
+    "k1 ≠ k2 ⟹
+     enc_formula (formula_of (parity_vec n k1))
+     ≠ enc_formula (formula_of (parity_vec n k2))"
 begin
 
-section ‹Universal proof contradiction under your paper’s assumption›
+lemma contains_formula_imp_contains_parity:
+  assumes "p ⊐ enc_formula (formula_of x)"
+  shows   "p ⊐ enc_parity x"
+proof -
+  obtain rest where F: "enc_formula (formula_of x) = enc_parity x @ rest"
+    using enc_formula_prefix by blast
+  show ?thesis
+    unfolding contains_def using assms F by auto
+qed
+
+text ‹A tiny AIT interface for “random” strings used to force the length contradiction.›
+locale Random_Strings =
+  fixes random :: "nat ⇒ bitstring ⇒ bool"
+  assumes random_length: "random m s ⟹ length s = m"
+  assumes many_random:   "card {s. length s = m ∧ random m s} ≥ 2 ^ (m - 1)"
+  assumes random_incompressible:
+    "⟦ random m s; p ⊐ s ⟧ ⟹ length p ≥ m"
+begin
 
 definition proof_len :: "bitstring ⇒ nat" where "proof_len p = length p"
 
-definition collatz_pointwise_proof ::
-  "(bitstring ⇒ nat ⇒ nat ⇒ bool) ⇒ bitstring ⇒ bool"
-where
-  "collatz_pointwise_proof P p ⟷ (∀n. ∃k. P p k n)"
+definition collatz_cofinal_proof ::
+  "(bitstring ⇒ nat ⇒ nat ⇒ bool) ⇒ bitstring ⇒ bool" where
+  "collatz_cofinal_proof P p ⟷ (∀n L. ∃k≥L. P p k n)"
 
-(* No +2, no cofinal: pointwise alone yields the contradiction *)
-theorem no_finite_pointwise_proof_min:
-  assumes Pp: "collatz_pointwise_proof is_proof p"
+text ‹This is your original parity-vector incompressibility argument.›
+lemma no_finite_cofinal_proof_parity:
+  assumes U: "collatz_cofinal_proof is_proof p"
   shows False
 proof -
-  (* pick, for each n, some k witnessing is_proof p k n *)
-  define kn where "kn n = (SOME k. is_proof p k n)"
-  have kn_ok: "is_proof p (kn n) n" for n
-    unfolding kn_def using Pp collatz_pointwise_proof_def someI_ex
-    by (metis ‹kn ≡ λn. SOME k. is_proof p k n›)
+  let ?L = proof_len p
+  let ?S = "{s::bitstring. length s = Suc ?L ∧ random (Suc ?L) s}"
 
-  (* map n ↦ the encoded statement p must contain *)
-  define Efun where "Efun n = enc_stmt n (kn n)"
+  have finS_len: "finite {s::bitstring. length s = Suc ?L}"
+    by (rule finite_bitstrings_of_len)
+  have finS: "finite ?S" using finS_len by simp
 
-  (* injective in n because enc_stmt is injective in (n,k) *)
-  have inj_E: "inj Efun"
-    proof (rule injI)
-    fix n m assume "Efun n = Efun m"
-    hence "enc_stmt n (kn n) = enc_stmt m (kn m)" using Efun_def
-    by (simp add: ‹Efun ≡ λn. enc_stmt n (kn n)›)
-    from enc_stmt_inj[OF this] show "n = m" by simp
-  qed
+  from many_random[of "Suc ?L"] have "2 ^ ?L ≤ card ?S" by simp
+  then have "?S ≠ {}" by (cases "?S") auto
+  then obtain s where sLen: "length s = Suc ?L" and sRand: "random (Suc ?L) s" by auto
 
-  (* every image point is a substring of p *)
-  have subset: "range Efun ⊆ {s. p ⊐ s}"
-    unfolding Efun_def using must_contain_stmt[OF kn_ok] 
-      ‹Efun ≡ λn. enc_stmt n (kn n)›by auto
+  (* Realise s as a parity vector of length L+1 *)
+  obtain n where npar: "parity_vec n (length s) = s"
+    using parity_vector_realisable by blast
+  define Ls where "Ls = length s"
 
-  (* but a finite string has only finitely many substrings *)
-  have fin: "finite {s::bitstring. p ⊐ s}" by (rule finite_substrings_of)
+  (* Cofinal ⇒ pick k ≥ Ls with is_proof p k n *)
+  obtain k where k_ge: "k ≥ Ls" and kpf: "is_proof p k n"
+    using U unfolding collatz_cofinal_proof_def Ls_def by blast
 
-  (* contradiction: injective image of ℕ is infinite *)
-  have inf_range: "infinite (range Efun)"
-  proof
-    assume finR: "finite (range Efun)"
-    have fin_img: "finite (Efun ` (UNIV :: nat set))"
-      using finR by simp
-    have inj_on_E: "inj_on Efun (UNIV :: nat set)"
-      using inj_E by (simp add: inj_on_def)
-    from finite_imageD[OF fin_img inj_on_E]
-    have "finite (UNIV :: nat set)" .
-    thus False by simp
-  qed
-  (* since p has only finitely many substrings, any subset is finite *)
-  have fin_range: "finite (range Efun)"
-    using fin subset  by (simp add: finite_subset)
-  (* contradiction *)
-  show False
-    using inf_range fin_range by contradiction
+  (* Proof must contain the encoded formula ⇒ contains the parity prefix *)
+  have has_formula: "p ⊐ enc_formula (formula_of (parity_vec n k))"
+    using kpf must_contain_formula by blast
+  hence has_parity: "p ⊐ enc_parity (parity_vec n k)"
+    by (rule contains_formula_imp_contains_parity)
+
+  (* Extract s as a prefix of parity_vec n k *)
+  obtain rest where pv_split: "parity_vec n k = parity_vec n Ls @ rest"
+    using parity_vec_prefix[OF k_ge] by blast
+  hence "enc_parity (parity_vec n k) = s @ rest"
+    using npar Ls_def by simp
+  then have "p ⊐ s"
+    using has_parity by (auto simp: contains_def)
+
+  (* Incompressibility contradiction: |p| ≥ |s| = Suc |p| *)
+  have "length p ≥ Suc ?L"
+    using random_incompressible[OF sRand ‹p ⊐ s›] sLen proof_len_def by simp
+  thus False by (simp add: proof_len_def)
 qed
 
-end
-end
+end  (* Random_Strings *)
+end  (* ProofsContainFormulas_Min *)
