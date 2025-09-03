@@ -596,8 +596,7 @@ lemma finite_substrings_of:
 proof -
   have "{s::bitstring. p ⊐ s} ⊆ {s. length s ≤ length p}"
     using contains_len_bound by auto
-  then show ?thesis
-    by (rule finite_subset[OF finite_bitstrings_le_len]) simp
+  then show ?thesis using finite_bitstrings_le_len rev_finite_subset by auto
 qed
 
 text ‹Encode formulas so that the parity vector appears as a prefix.›
@@ -607,19 +606,23 @@ definition enc_parity :: "bitstring ⇒ bitstring" where
 lemma enc_parity_is_id[simp]: "enc_parity x = x"
   by (simp add: enc_parity_def)
 
-locale ProofsContainFormulas_Min =
-  fixes is_proof    :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
-  and   enc_formula :: "nat × nat × nat ⇒ bitstring"
+locale Proof_Contains_Formula =
+  fixes is_proof      :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
+  and   enc_formula   :: "nat × nat × nat ⇒ bitstring"
+  and   enc_parity    :: "bool list ⇒ bitstring"
+  and   collatz_proof :: "bitstring ⇒ bool"
+  assumes enc_parity_is_id: "enc_parity = id"
   assumes must_contain_formula:
     "is_proof p k n ⟹ p ⊐ enc_formula (formula_of (parity_vec n k))"
   assumes enc_formula_prefix:
-    "∃rest. enc_formula (formula_of x) = enc_parity x @ rest" for x
-  assumes encodings_distinct_in_k:
-    "k1 ≠ k2 ⟹
-     enc_formula (formula_of (parity_vec n k1))
-     ≠ enc_formula (formula_of (parity_vec n k2))"
+    "∃rest. enc_formula (formula_of x) = enc_parity x @ rest"
+  assumes "collatz_proof p ⟹ ∀n. ∃k. is_proof p k n"
 begin
 
+text ‹
+  Since ‹enc_parity = id› and ‹enc_formula› has ‹enc_parity x› as a prefix,
+  any proof that “contains the formula” necessarily contains the parity bits.
+›
 lemma contains_formula_imp_contains_parity:
   assumes "p ⊐ enc_formula (formula_of x)"
   shows   "p ⊐ enc_parity x"
@@ -627,68 +630,83 @@ proof -
   obtain rest where F: "enc_formula (formula_of x) = enc_parity x @ rest"
     using enc_formula_prefix by blast
   show ?thesis
-    unfolding contains_def using assms F by auto
+    unfolding contains_def using assms F Collatz_Unprovable.contains_def by auto
 qed
 
-text ‹A tiny AIT interface for “random” strings used to force the length contradiction.›
+end
+
+section ‹Random strings interface (minimal AIT counting facts)›
+
 locale Random_Strings =
   fixes random :: "nat ⇒ bitstring ⇒ bool"
   assumes random_length: "random m s ⟹ length s = m"
   assumes many_random:   "card {s. length s = m ∧ random m s} ≥ 2 ^ (m - 1)"
   assumes random_incompressible:
     "⟦ random m s; p ⊐ s ⟧ ⟹ length p ≥ m"
-begin
+begin end
 
 definition proof_len :: "bitstring ⇒ nat" where "proof_len p = length p"
 
-definition collatz_cofinal_proof ::
-  "(bitstring ⇒ nat ⇒ nat ⇒ bool) ⇒ bitstring ⇒ bool" where
-  "collatz_cofinal_proof P p ⟷ (∀n L. ∃k≥L. P p k n)"
+locale PCF_RS = Proof_Contains_Formula + Random_Strings
+context PCF_RS
 
-text ‹This is your original parity-vector incompressibility argument.›
-lemma no_finite_cofinal_proof_parity:
-  assumes U: "collatz_cofinal_proof is_proof p"
+begin
+
+theorem no_finite_proof:
+  assumes U: "collatz_proof p"
   shows False
 proof -
-  let ?L = proof_len p
-  let ?S = "{s::bitstring. length s = Suc ?L ∧ random (Suc ?L) s}"
+  let ?L = "proof_len p"
+  let ?A = "{s::bitstring. length s = Suc ?L ∧ random (Suc ?L) s}"
 
-  have finS_len: "finite {s::bitstring. length s = Suc ?L}"
-    by (rule finite_bitstrings_of_len)
-  have finS: "finite ?S" using finS_len by simp
+  have fin: "finite ?A"
+  proof -
+    have "?A ⊆ {s::bitstring. length s = Suc ?L}" by auto
+    thus ?thesis
+      using finite_bitstrings_of_len by (rule finite_subset)
+  qed
 
-  from many_random[of "Suc ?L"] have "2 ^ ?L ≤ card ?S" by simp
-  then have "?S ≠ {}" by (cases "?S") auto
-  then obtain s where sLen: "length s = Suc ?L" and sRand: "random (Suc ?L) s" by auto
+  have lower: "card ?A ≥ 2 ^ (Suc ?L - 1)"
+    using many_random[of "Suc ?L"] by simp
 
-  (* Realise s as a parity vector of length L+1 *)
-  obtain n where npar: "parity_vec n (length s) = s"
-    using parity_vector_realisable by blast
-  define Ls where "Ls = length s"
+  have nz: "0 < card ?A"
+    using lower power_not_zero by fastforce
 
-  (* Cofinal ⇒ pick k ≥ Ls with is_proof p k n *)
-  obtain k where k_ge: "k ≥ Ls" and kpf: "is_proof p k n"
-    using U unfolding collatz_cofinal_proof_def Ls_def by blast
+  have A_ne: "?A ≠ {}"
+    using fin nz by fastforce
+  obtain s where s_in: "s ∈ ?A"
+    using A_ne by blast
+  have s_len: "length s = Suc ?L" and sR: "random (Suc ?L) s"
+    using s_in by auto
+  obtain n where npar: "parity_vec n (Suc ?L) = s"
+    using parity_vector_realisable[of s] by (metis s_len)
 
-  (* Proof must contain the encoded formula ⇒ contains the parity prefix *)
+  obtain k where kpf: "is_proof p k n"
+    using U Proof_Contains_Formula_axioms Proof_Contains_Formula_def 
+    by fastforce
+
   have has_formula: "p ⊐ enc_formula (formula_of (parity_vec n k))"
     using kpf must_contain_formula by blast
   hence has_parity: "p ⊐ enc_parity (parity_vec n k)"
     by (rule contains_formula_imp_contains_parity)
 
-  (* Extract s as a prefix of parity_vec n k *)
-  obtain rest where pv_split: "parity_vec n k = parity_vec n Ls @ rest"
-    using parity_vec_prefix[OF k_ge] by blast
-  hence "enc_parity (parity_vec n k) = s @ rest"
-    using npar Ls_def by simp
-  then have "p ⊐ s"
-    using has_parity by (auto simp: contains_def)
+  from enc_parity_is_id have EP: "enc_parity = id" by simp
+  have "p ⊐ s"
+  proof -
+    have "take (length s) (parity_vec n k) = s"
+      using npar s_len by (simp add: min_absorb1[of "Suc ?L" k] take_map parity_vec_def)
+    then obtain rest where "parity_vec n k = s @ rest"
+      using append_take_drop_id[of "length s" "parity_vec n k"] by (auto simp: s_len)
+    hence "enc_parity (parity_vec n k) = s @ rest"
+      by (simp add: EP)
+    thus ?thesis
+      using has_parity unfolding contains_def by auto
+  qed
 
-  (* Incompressibility contradiction: |p| ≥ |s| = Suc |p| *)
-  have "length p ≥ Suc ?L"
-    using random_incompressible[OF sRand ‹p ⊐ s›] sLen proof_len_def by simp
+  hence "length p ≥ Suc ?L"
+    using random_incompressible sR by blast
   thus False by (simp add: proof_len_def)
 qed
 
-end  (* Random_Strings *)
-end  (* ProofsContainFormulas_Min *)
+end
+end
