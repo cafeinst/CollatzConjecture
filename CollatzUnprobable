@@ -616,21 +616,31 @@ locale Proof_Contains_Formula =
     "is_proof p k n ⟹ p ⊐ enc_formula (formula_of (parity_vec n k))"
   assumes enc_formula_prefix:
     "∃rest. enc_formula (formula_of x) = enc_parity x @ rest"
-  assumes "collatz_proof p ⟹ ∀n. ∃k. is_proof p k n"
+  assumes collatz_proof_unbounded:
+    "collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof p k n"
 begin
 
 text ‹
   Since ‹enc_parity = id› and ‹enc_formula› has ‹enc_parity x› as a prefix,
   any proof that “contains the formula” necessarily contains the parity bits.
 ›
-lemma contains_formula_imp_contains_parity:
-  assumes "p ⊐ enc_formula (formula_of x)"
-  shows   "p ⊐ enc_parity x"
+
+lemma parity_vec_prefix:
+  "m ≤ k ⟹ take m (parity_vec n k) = parity_vec n m"
+  by (simp add: parity_vec_def take_map)
+
+lemma contains_parity_of_len:
+  assumes "is_proof p k n"
+  shows   "p ⊐ enc_parity (parity_vec n k)"
 proof -
-  obtain rest where F: "enc_formula (formula_of x) = enc_parity x @ rest"
+  obtain rest where
+    F: "enc_formula (formula_of (parity_vec n k))
+        = enc_parity (parity_vec n k) @ rest"
     using enc_formula_prefix by blast
-  show ?thesis
-    unfolding contains_def using assms F Collatz_Unprovable.contains_def by auto
+  from must_contain_formula[OF assms]
+  obtain u v where "p = u @ enc_formula (formula_of (parity_vec n k)) @ v"
+    unfolding contains_def by blast
+  with F show ?thesis unfolding contains_def by auto
 qed
 
 end
@@ -656,56 +666,53 @@ theorem no_finite_proof:
   assumes U: "collatz_proof p"
   shows False
 proof -
-  let ?L = "proof_len p"
-  let ?A = "{s::bitstring. length s = Suc ?L ∧ random (Suc ?L) s}"
+(* Fix the target length and the set exactly once *)
+  define L where "L = proof_len p"
+  let ?A = "{s::bitstring. length s = Suc L ∧ random (Suc L) s}"
 
+(* 1) Prove finiteness of ?A *)
   have fin: "finite ?A"
   proof -
-    have "?A ⊆ {s::bitstring. length s = Suc ?L}" by auto
-    thus ?thesis
-      using finite_bitstrings_of_len by (rule finite_subset)
+    have "?A ⊆ {s::bitstring. length s = Suc L}" by auto
+    thus ?thesis using finite_bitstrings_of_len[of "Suc L"] by (rule finite_subset)
   qed
 
-  have lower: "card ?A ≥ 2 ^ (Suc ?L - 1)"
-    using many_random[of "Suc ?L"] by simp
-
+(* 2) Positive lower bound on |?A|, then strict positivity *)
+  have lb: "card ?A ≥ 2 ^ (Suc L - 1)"
+    using many_random[of "Suc L"] by simp
   have nz: "0 < card ?A"
-    using lower power_not_zero by fastforce
+    using power_eq_0_iff lb by fastforce   (* since 2^(…) ≥ 1 *)
 
-  have A_ne: "?A ≠ {}"
-    using fin nz by fastforce
-  obtain s where s_in: "s ∈ ?A"
-    using A_ne by blast
-  have s_len: "length s = Suc ?L" and sR: "random (Suc ?L) s"
+(* 3) Extract a witness s ∈ ?A without fragile rewriting *)
+  have "?A ≠ {}" using fin nz by fastforce
+  then obtain s where s_in: "s ∈ ?A" by auto
+
+(* 4) Unpack exactly what we need *)
+  have s_len: "length s = Suc L" and sR: "random (Suc L) s"
     using s_in by auto
-  obtain n where npar: "parity_vec n (Suc ?L) = s"
-    using parity_vector_realisable[of s] by (metis s_len)
 
-  obtain k where kpf: "is_proof p k n"
-    using U Proof_Contains_Formula_axioms Proof_Contains_Formula_def 
-    by fastforce
+  (* By unbounded coverage, choose k ≥ Suc ?L for this n *)
+  obtain k where k_ge: "k ≥ Suc L" and kpf: "is_proof p k n"
+    using collatz_proof_unbounded[OF U, THEN spec, of n]
+          by metis
 
-  have has_formula: "p ⊐ enc_formula (formula_of (parity_vec n k))"
-    using kpf must_contain_formula by blast
-  hence has_parity: "p ⊐ enc_parity (parity_vec n k)"
-    by (rule contains_formula_imp_contains_parity)
-
+  (* The proof contains parity_vec n k, hence also its prefix of length Suc ?L = s *)
+  have has_k: "p ⊐ enc_parity (parity_vec n k)"
+    by (rule contains_parity_of_len[OF kpf])
   from enc_parity_is_id have EP: "enc_parity = id" by simp
   have "p ⊐ s"
   proof -
-    have "take (length s) (parity_vec n k) = s"
-      using npar s_len by (simp add: min_absorb1[of "Suc ?L" k] take_map parity_vec_def)
-    then obtain rest where "parity_vec n k = s @ rest"
-      using append_take_drop_id[of "length s" "parity_vec n k"] by (auto simp: s_len)
-    hence "enc_parity (parity_vec n k) = s @ rest"
-      by (simp add: EP)
-    thus ?thesis
-      using has_parity unfolding contains_def by auto
+    have "parity_vec n (Suc L) = take (Suc L) (parity_vec n k)"
+      using parity_vec_prefix k_ge by simp
+    with has_k EP show ?thesis
+      unfolding contains_def using L_def k_ge proof_len_def by force
   qed
 
-  hence "length p ≥ Suc ?L"
+  (* Incompressibility contradiction *)
+  hence "length p ≥ Suc L"
     using random_incompressible sR by blast
-  thus False by (simp add: proof_len_def)
+  thus False
+    by (simp add: L_def proof_len_def)
 qed
 
 end
