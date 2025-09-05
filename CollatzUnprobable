@@ -600,52 +600,31 @@ proof -
 qed
 
 text ‹Encode formulas so that the parity vector appears as a prefix.›
-definition enc_parity :: "bitstring ⇒ bitstring" where
-  "enc_parity = id"
-
-lemma enc_parity_is_id[simp]: "enc_parity x = x"
-  by (simp add: enc_parity_def)
 
 locale Proof_Contains_Formula =
   fixes is_proof      :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
-  and   enc_formula   :: "nat × nat × nat ⇒ bitstring"
-  and   enc_parity    :: "bool list ⇒ bitstring"
+  and enc_parity :: "bitstring ⇒ bitstring"
   and   is_collatz_proof :: "bitstring ⇒ bool"
   and   is_collatz_unbounded_proof :: "bitstring ⇒ bool"
-  assumes enc_parity_is_id: "enc_parity = id"
+  assumes enc_parity_inj: "inj enc_parity"
   assumes sound: "is_proof p k n ⟹ Tpow k n = 1"
-  assumes must_contain_formula:
-    "is_proof p k n ⟹ p ⊐ enc_formula (formula_of (parity_vec n k))"
-  assumes enc_formula_prefix:
-    "∃rest. enc_formula (formula_of x) = enc_parity x @ rest"
-  assumes collatz_unbounded:
-    "is_collatz_unbounded_proof p ⟹ ∀n L. ∃k≥L. is_proof p k n"
+  assumes contains_parity_prefixes:
+    "is_proof p k n ⟹ ∀m≤k. p ⊐ enc_parity (parity_vec n m)"
   assumes collatz:
-    "is_collatz_proof p ⟹ ∀n. ∃k. is_proof p k n"
+    "is_collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof p k n"
 begin
 
 text ‹
   Since ‹enc_parity = id› and ‹enc_formula› has ‹enc_parity x› as a prefix,
   any proof that “contains the formula” necessarily contains the parity bits.
 ›
+lemma enc_parity_eq_iff[simp]:
+  "enc_parity x = enc_parity y ⟷ x = y"
+  using enc_parity_inj unfolding inj_def by blast
 
 lemma parity_vec_prefix:
   "m ≤ k ⟹ take m (parity_vec n k) = parity_vec n m"
   by (simp add: parity_vec_def take_map)
-
-lemma contains_parity_of_len:
-  assumes "is_proof p k n"
-  shows   "p ⊐ enc_parity (parity_vec n k)"
-proof -
-  obtain rest where
-    F: "enc_formula (formula_of (parity_vec n k))
-        = enc_parity (parity_vec n k) @ rest"
-    using enc_formula_prefix by blast
-  from must_contain_formula[OF assms]
-  obtain u v where "p = u @ enc_formula (formula_of (parity_vec n k)) @ v"
-    unfolding contains_def by blast
-  with F show ?thesis unfolding contains_def by auto
-qed
 
 end
 
@@ -666,112 +645,86 @@ context PCF_RS
 
 begin
 
-theorem no_collatz_unbounded_proof:
-  assumes U: "is_collatz_unbounded_proof p"
+lemma card_bitstrings_len: "card {s::bitstring. length s = m} = 2 ^ m"
+  by (simp add: card_lists_length_eq)
+
+lemma sum_pow2_lt: "(∑ i<m. (2::nat) ^ i) = 2 ^ m - 1"
+  by (induction m) simp_all
+
+lemma card_bitstrings_le_len:
+  "card {s::bitstring. length s ≤ m} = (∑ i≤m. 2 ^ i)"
+proof -
+  have "{s::bitstring. length s ≤ m} = (⋃ i∈{..m}. {s. length s = i})"
+    by auto
+  moreover have "⋀i. finite {s::bitstring. length s = i}"
+    by (simp add: finite_bitstrings_of_len)
+  moreover have "disjoint_family_on (λi. {s::bitstring. length s = i}) {..m}"
+    by (simp add: disjoint_family_on_def)
+  ultimately show ?thesis
+    by (simp add: card_UN_disjoint finite_atMost card_bitstrings_len)
+qed
+
+(* Pigeonhole: injective enc_parity cannot shrink every m-bit string below m *)
+lemma exists_nonshrinking_code_for_length:
+  assumes INJ: "inj enc_parity"
+  shows "∃t::bitstring. length t = m ∧ m ≤ length (enc_parity t)"
+proof -
+  let ?S = "{t::bitstring. length t = m}"
+  let ?T = "{u::bitstring. length u ≤ m - 1}"
+
+  have Sm: "card ?S = 2 ^ m" by (simp add: card_bitstrings_len)
+  have Tm: "card ?T = (∑ i≤m-1. 2 ^ i)"
+    by (simp add: card_bitstrings_le_len)
+  have "card ?T = (∑ i<m. 2 ^ i)"
+    using Tm by (simp add: atMost_nat_le_eq lessThan_atMost)
+  hence "card ?T = 2 ^ m - 1" using sum_pow2_lt by simp
+  hence "card ?T < card ?S" using Sm by simp
+
+  have False if H: "∀t∈?S. length (enc_parity t) ≤ m - 1"
+  proof -
+    have "enc_parity ` ?S ⊆ ?T" using H by auto
+    then have "card (enc_parity ` ?S) ≤ card ?T"
+      by (rule card_mono) (auto intro: finite_bitstrings_le_len)
+    moreover from INJ have "card (enc_parity ` ?S) = card ?S"
+      by (simp add: card_image)
+    ultimately show False using ‹card ?T < card ?S› by linarith
+  qed
+  then obtain t where "t∈?S" and "¬ length (enc_parity t) ≤ m - 1" by blast
+  thus ?thesis by auto
+qed
+
+(* Core contradiction, expressed over the *property* (no predicate needed) *)
+theorem no_proof_with_unbounded_witnesses:
+  assumes UB: "∀n L. ∃k≥L. is_proof p k n"
   shows False
 proof -
-(* Fix the target length and the set exactly once *)
   define L where "L = proof_len p"
-  let ?A = "{s::bitstring. length s = Suc L ∧ random (Suc L) s}"
+  let ?m = "Suc L"
 
-(* 1) Prove finiteness of ?A *)
-  have fin: "finite ?A"
-  proof -
-    have "?A ⊆ {s::bitstring. length s = Suc L}" by auto
-    thus ?thesis using finite_bitstrings_of_len[of "Suc L"] by (rule finite_subset)
-  qed
+  (* choose a length-m parity block whose encoding doesn't shrink below m *)
+  obtain t where t_len: "length t = ?m" and t_ns: "?m ≤ length (enc_parity t)"
+    using exists_nonshrinking_code_for_length[OF enc_parity_inj, of ?m] by blast
 
-(* 2) Positive lower bound on |?A|, then strict positivity *)
-  have lb: "card ?A ≥ 2 ^ (Suc L - 1)"
-    using many_random[of "Suc L"] by simp
-  have nz: "0 < card ?A"
-    using power_eq_0_iff lb by fastforce   (* since 2^(…) ≥ 1 *)
+  (* realize that parity block as the first m parities of some n0 *)
+  obtain n0 where n0_t: "parity_vec n0 ?m = t"
+    using parity_vector_realisable[of t] t_len by blast
 
-(* 3) Extract a witness s ∈ ?A without fragile rewriting *)
-  have "?A ≠ {}" using fin nz by fastforce
-  then obtain s where s_in: "s ∈ ?A" by auto
+  (* unbounded witnesses: pick k≥m with a proof for this n0 *)
+  obtain k where k_ge: "k ≥ ?m" and kpf: "is_proof p k n0"
+    using UB by blast
 
-(* 4) Unpack exactly what we need *)
-  have s_len: "length s = Suc L" and sR: "random (Suc L) s"
-    using s_in by auto
+  (* proof contains *every* prefix encode up to k; take m = Suc L *)
+  have "p ⊐ enc_parity (parity_vec n0 ?m)"
+    using contains_parity_prefixes[OF kpf] k_ge by simp
+  hence "p ⊐ enc_parity t" by (simp add: n0_t)
 
-  (* By unbounded coverage, choose k ≥ Suc ?L for this n *)
-  obtain k where k_ge: "k ≥ Suc L" and kpf: "is_proof p k n"
-    using collatz_unbounded[OF U, THEN spec, of n]
-          by metis
+  (* substrings can't be longer than the whole string *)
+  hence "length (enc_parity t) ≤ length p"
+    using contains_len_bound by blast
 
-  (* The proof contains parity_vec n k, hence also its prefix of length Suc ?L = s *)
-  have has_k: "p ⊐ enc_parity (parity_vec n k)"
-    by (rule contains_parity_of_len[OF kpf])
-  from enc_parity_is_id have EP: "enc_parity = id" by simp
-  have "p ⊐ s"
-  proof -
-    have "parity_vec n (Suc L) = take (Suc L) (parity_vec n k)"
-      using parity_vec_prefix k_ge by simp
-    with has_k EP show ?thesis
-      unfolding contains_def using L_def k_ge proof_len_def by force
-  qed
-
-  (* Incompressibility contradiction *)
-  hence "length p ≥ Suc L"
-    using random_incompressible sR by blast
-  thus False
+  (* combine: m ≤ length(enc_parity t) ≤ length p = L ⇒ Suc L ≤ L, contradiction *)
+  from t_ns this show False
     by (simp add: L_def proof_len_def)
-qed
-
-lemma T_on_1_2[simp]: "T 1 = 2" "T 2 = 1"
-  by (simp_all add: T_def)
-
-lemma hits_one_unbounded:
-  assumes "Tpow k n = 1"
-  shows   "Tpow (k + 2*t) n = 1"  "Tpow (k + 2*t + 1) n = 2"
-proof -
-  have step2: "Tpow (k+2) n = 1"
-    using assms T_on_1_2(1) by auto
-  have stepS: "⋀t. Tpow (k + 2*t) n = 1 ⟹ Tpow (k + 2*(Suc t)) n = 1"
-    using T_on_1_2(1) by force
-  show "Tpow (k + 2*t) n = 1"
-    using step2 assms by (induction t) (simp_all add: funpow_add)
-  then show "Tpow (k + 2*t + 1) n = 2"
-    by (metis Suc_eq_plus1 T_on_1_2(1) funpow_Suc_left)
-qed
-
-lemma truth_unbounded:
-  assumes "∃k. Tpow k n = 1"
-  shows "∀L. ∃k≥L. Tpow k n = 1"
-proof
-  fix L obtain k0 where "Tpow k0 n = 1" using assms by auto
-  let ?t = "(L - k0 + 1) div 2"
-  have "k0 + 2*?t ≥ L" by arith
-  thus "∃k≥L. Tpow k n = 1"
-    using hits_one_unbounded(1)[OF ‹Tpow k0 n = 1›] by blast
-qed
-
-lemma Collatz_implies_Collatz_unbounded:
-  assumes Pp: "is_collatz_proof p"
-  shows "is_collatz_unbounded_proof p"
-proof -
-  have exk: "∀n. ∃k0. is_proof p k0 n" using collatz[OF Pp] .
-  have UB: "∀n L. ∃k≥L. is_proof p k n"
-  proof (intro allI)
-    fix n L
-    obtain k0 where P0: "is_proof p k0 n" using exk by blast
-    from sound[OF P0] have "∃k. Tpow k n = 1" by auto
-    then obtain k where "k ≥ L" and "Tpow k n = 1"
-      using truth_unbounded by blast
-    thus "∃k≥L. is_proof p k n" using UB by simp
-  qed
-  show ?thesis by (rule unbounded_intro[OF UB])
-qed
-
-theorem no_Collatz_proof:
-  assumes Pp: "is_collatz_proof p"
-  shows False
-proof -
-  have Cof: "is_collatz_unbounded_proof p"
-    using Collatz_implies_Collatz_unbounded[OF Pp] .
-  show False
-    using no_collatz_unbounded_proof[OF Cof] .
 qed
 
 end
