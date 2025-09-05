@@ -316,6 +316,11 @@ next
   qed
 qed
 
+lemma parity_vec_prefix:
+  assumes "m ≤ k"
+  shows "take m (parity_vec n k) = parity_vec n m"
+  using assms by (simp add: parity_vec_def take_map)
+
 lemma parity_vec_add_pow2_invariant:
   fixes m q k :: nat
   shows "parity_vec (m + q * 2 ^ k) k = parity_vec m k"
@@ -599,17 +604,69 @@ proof -
   then show ?thesis using finite_bitstrings_le_len rev_finite_subset by auto
 qed
 
+definition prefix_block :: "(bitstring ⇒ bitstring) ⇒ bitstring ⇒ nat ⇒ bitstring" where
+  "prefix_block enc q k = concat (map (λm. enc (take m q)) [0..<Suc k])"
+
+definition is_proof_T ::
+  "(bitstring ⇒ bitstring) ⇒ bitstring ⇒ nat ⇒ nat ⇒ bool" where
+  "is_proof_T enc p k n ⟷ (∃q u v. q = parity_vec n k ∧ p = u @ prefix_block enc q k @ v)"
+
+lemma upt_split_mid:
+  assumes "m ≤ k"
+  shows "[0..<Suc k] = [0..<m] @ m # [Suc m..<Suc k]"
+  using assms by (smt (verit, best) le_iff_add le_zero_eq nle_le not_less_eq_eq 
+      upt_add_eq_append upt_eq_Nil_conv upt_rec)
+
+lemma prefix_block_contains_piece:
+  assumes "m ≤ k"
+  shows "prefix_block enc q k ⊐ enc (take m q)"
+proof -
+  have "map (λi. enc (take i q)) [0..<Suc k]
+      = map (λi. enc (take i q)) [0..<m]
+        @ enc (take m q) # map (λi. enc (take i q)) [Suc m..<Suc k]"
+    using upt_split_mid[OF assms] by simp
+  thus ?thesis
+    unfolding prefix_block_def contains_def 
+    by (metis concat.simps(2) concat_append)
+qed
+
+lemma contains_parity_prefixes_T:
+  assumes Pf: "is_proof_T enc_parity p k n"
+  shows "∀m≤k. p ⊐ enc_parity (parity_vec n m)"
+proof (intro allI impI)
+  fix m assume "m ≤ k"
+  from Pf obtain q u v where
+    Q: "q = parity_vec n k" and
+    P: "p = u @ prefix_block enc_parity q k @ v"
+    unfolding is_proof_T_def by blast
+  have "prefix_block enc_parity q k ⊐ enc_parity (take m q)"
+    using prefix_block_contains_piece[OF ‹m ≤ k›] .
+  then obtain u' v' where
+    "prefix_block enc_parity q k = u' @ enc_parity (take m q) @ v'"
+    unfolding contains_def by blast
+  have step:
+    "p = (u @ u') @ enc_parity (take m q) @ (v' @ v)"
+    using P ‹prefix_block enc_parity q k = u' @ enc_parity (take m q) @ v'› 
+    by force
+  have H1: "p ⊐ enc_parity (take m q)"
+    unfolding contains_def
+    by (intro exI[of _ "u @ u'"] exI[of _ "v' @ v"]) (simp add: step)
+  have H2: "take m q = parity_vec n m"
+    by (simp add: Q ‹m ≤ k› parity_vec_prefix)
+  show "p ⊐ enc_parity (parity_vec n m)"
+    using H1 H2 by simp
+qed
+
 text ‹Encode formulas so that the parity vector appears as a prefix.›
 
 locale Proof_Contains_Formula =
   fixes is_proof      :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
   and enc_parity :: "bitstring ⇒ bitstring"
   and   is_collatz_proof :: "bitstring ⇒ bool"
-  and   is_collatz_unbounded_proof :: "bitstring ⇒ bool"
   assumes enc_parity_inj: "inj enc_parity"
   assumes sound: "is_proof p k n ⟹ Tpow k n = 1"
-  assumes contains_parity_prefixes:
-    "is_proof p k n ⟹ ∀m≤k. p ⊐ enc_parity (parity_vec n m)"
+  assumes step_checkable:
+    "is_proof p k n ⟹ ∀i<k. p ⊐ enc_parity [odd (Tpow i n)]"
   assumes collatz:
     "is_collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof p k n"
 begin
@@ -621,10 +678,6 @@ text ‹
 lemma enc_parity_eq_iff[simp]:
   "enc_parity x = enc_parity y ⟷ x = y"
   using enc_parity_inj unfolding inj_def by blast
-
-lemma parity_vec_prefix:
-  "m ≤ k ⟹ take m (parity_vec n k) = parity_vec n m"
-  by (simp add: parity_vec_def take_map)
 
 end
 
@@ -645,8 +698,19 @@ context PCF_RS
 
 begin
 
-lemma card_bitstrings_len: "card {s::bitstring. length s = m} = 2 ^ m"
-  by (simp add: card_lists_length_eq)
+lemma card_bitstrings_len:
+  "card {s::bitstring. length s = m} = 2 ^ m"
+proof -
+  have H: "card {s::bool list. set s ⊆ (UNIV::bool set) ∧ length s = m}
+           = (card (UNIV::bool set)) ^ m"
+    using card_lists_length_eq finite 
+    by blast
+  also have "{s::bool list. set s ⊆ (UNIV::bool set) ∧ length s = m}
+           = {s::bitstring. length s = m}"
+    by auto
+  also have "card (UNIV::bool set) = 2" by simp
+  finally show ?thesis by simp
+qed
 
 lemma sum_pow2_lt: "(∑ i<m. (2::nat) ^ i) = 2 ^ m - 1"
   by (induction m) simp_all
@@ -654,47 +718,75 @@ lemma sum_pow2_lt: "(∑ i<m. (2::nat) ^ i) = 2 ^ m - 1"
 lemma card_bitstrings_le_len:
   "card {s::bitstring. length s ≤ m} = (∑ i≤m. 2 ^ i)"
 proof -
-  have "{s::bitstring. length s ≤ m} = (⋃ i∈{..m}. {s. length s = i})"
-    by auto
-  moreover have "⋀i. finite {s::bitstring. length s = i}"
+  let ?S = "λi. {s::bitstring. length s = i}"
+  have union_eq: "{s::bitstring. length s ≤ m} = (⋃ i∈{..m}. ?S i)" by auto
+
+  have fin_index: "finite ({..m}::nat set)" by simp
+  have fin_each: "⋀i. i ≤ m ⟹ finite (?S i)"
     by (simp add: finite_bitstrings_of_len)
-  moreover have "disjoint_family_on (λi. {s::bitstring. length s = i}) {..m}"
-    by (simp add: disjoint_family_on_def)
-  ultimately show ?thesis
-    by (simp add: card_UN_disjoint finite_atMost card_bitstrings_len)
+  have disj: "⋀i j. i ≤ m ⟹ j ≤ m ⟹ i ≠ j ⟹ ?S i ∩ ?S j = {}"
+    by auto
+
+  have "card (⋃ i∈{..m}. ?S i) = (∑ i∈{..m}. card (?S i))"
+    by (rule card_UN_disjoint) (use fin_index fin_each disj in auto)
+  also have "… = (∑ i∈{..m}. 2 ^ i)"
+    by (simp add: card_bitstrings_len)
+  finally show ?thesis
+    by (simp add: union_eq)
 qed
 
 (* Pigeonhole: injective enc_parity cannot shrink every m-bit string below m *)
 lemma exists_nonshrinking_code_for_length:
   assumes INJ: "inj enc_parity"
   shows "∃t::bitstring. length t = m ∧ m ≤ length (enc_parity t)"
-proof -
-  let ?S = "{t::bitstring. length t = m}"
-  let ?T = "{u::bitstring. length u ≤ m - 1}"
+proof (cases m)
+  case 0
+  (* trivial: pick the empty string *)
+  have "length ([]::bitstring) = 0 ∧ 0 ≤ length (enc_parity ([]::bitstring))"
+    by simp
+  then show ?thesis using 0 by blast
+next
+  case (Suc r)
+  let ?S = "{t::bitstring. length t = Suc r}"
+  let ?T = "{u::bitstring. length u ≤ r}"
 
-  have Sm: "card ?S = 2 ^ m" by (simp add: card_bitstrings_len)
-  have Tm: "card ?T = (∑ i≤m-1. 2 ^ i)"
+  have finS: "finite ?S" by (simp add: finite_bitstrings_of_len)
+  have finT: "finite ?T" by (simp add: finite_bitstrings_le_len)
+
+  have Sm: "card ?S = 2 ^ Suc r"
+    by (simp add: card_bitstrings_len)
+  have Tm: "card ?T = (∑ i≤r. 2 ^ i)"
     by (simp add: card_bitstrings_le_len)
-  have "card ?T = (∑ i<m. 2 ^ i)"
-    using Tm by (simp add: atMost_nat_le_eq lessThan_atMost)
-  hence "card ?T = 2 ^ m - 1" using sum_pow2_lt by simp
-  hence "card ?T < card ?S" using Sm by simp
+  also have "... = (∑ i < Suc r. 2 ^ i)"
+    by (simp add: lessThan_Suc_atMost)
+  finally have Tm': "card ?T = (∑ i < Suc r. 2 ^ i)" .
 
-  have False if H: "∀t∈?S. length (enc_parity t) ≤ m - 1"
-  proof -
+  from Tm' have lt: "card ?T = 2 ^ Suc r - 1"
+    by (simp add: sum_pow2_lt)
+
+  from Sm lt have "card ?T < card ?S" by simp
+
+  (* Pigeonhole: not all images can land in lengths ≤ r *)
+  have not_all_shrink:
+    "¬ (∀t∈?S. length (enc_parity t) ≤ r)"
+  proof
+    assume H: "∀t∈?S. length (enc_parity t) ≤ r"
     have "enc_parity ` ?S ⊆ ?T" using H by auto
-    then have "card (enc_parity ` ?S) ≤ card ?T"
-      by (rule card_mono) (auto intro: finite_bitstrings_le_len)
-    moreover from INJ have "card (enc_parity ` ?S) = card ?S"
-      by (simp add: card_image)
+    hence "card (enc_parity ` ?S) ≤ card ?T"
+      using finT card_mono by blast
+    moreover from INJ finS have "card (enc_parity ` ?S) = card ?S"
+      using card_image by (metis subset_UNIV subset_inj_on)
     ultimately show False using ‹card ?T < card ?S› by linarith
   qed
-  then obtain t where "t∈?S" and "¬ length (enc_parity t) ≤ m - 1" by blast
-  thus ?thesis by auto
+
+  then obtain t where tS: "t ∈ ?S" and len: "¬ length (enc_parity t) ≤ r" by blast
+  hence "length (enc_parity t) ≥ Suc r" by simp
+  moreover from tS have "length t = Suc r" by auto
+  ultimately show ?thesis using Suc by blast
 qed
 
 (* Core contradiction, expressed over the *property* (no predicate needed) *)
-theorem no_proof_with_unbounded_witnesses:
+theorem no_collatz_proof:
   assumes UB: "∀n L. ∃k≥L. is_proof p k n"
   shows False
 proof -
@@ -707,7 +799,7 @@ proof -
 
   (* realize that parity block as the first m parities of some n0 *)
   obtain n0 where n0_t: "parity_vec n0 ?m = t"
-    using parity_vector_realisable[of t] t_len by blast
+    using parity_vector_realisable[of t] t_len by metis
 
   (* unbounded witnesses: pick k≥m with a proof for this n0 *)
   obtain k where k_ge: "k ≥ ?m" and kpf: "is_proof p k n0"
@@ -715,7 +807,7 @@ proof -
 
   (* proof contains *every* prefix encode up to k; take m = Suc L *)
   have "p ⊐ enc_parity (parity_vec n0 ?m)"
-    using contains_parity_prefixes[OF kpf] k_ge by simp
+    using step_checkable[OF kpf] k_ge by simp
   hence "p ⊐ enc_parity t" by (simp add: n0_t)
 
   (* substrings can't be longer than the whole string *)
