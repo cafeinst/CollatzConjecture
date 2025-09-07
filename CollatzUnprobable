@@ -607,9 +607,9 @@ qed
 definition prefix_block :: "(bitstring ⇒ bitstring) ⇒ bitstring ⇒ nat ⇒ bitstring" where
   "prefix_block enc q k = concat (map (λm. enc (take m q)) [0..<Suc k])"
 
-definition is_proof_T ::
+definition is_proof ::
   "(bitstring ⇒ bitstring) ⇒ bitstring ⇒ nat ⇒ nat ⇒ bool" where
-  "is_proof_T enc p k n ⟷ (∃q u v. q = parity_vec n k ∧ p = u @ prefix_block enc q k @ v)"
+  "is_proof enc p k n ⟷ (∃q u v. q = parity_vec n k ∧ p = u @ prefix_block enc q k @ v)"
 
 lemma upt_split_mid:
   assumes "m ≤ k"
@@ -630,45 +630,20 @@ proof -
     by (metis concat.simps(2) concat_append)
 qed
 
-lemma contains_parity_prefixes_T:
-  assumes Pf: "is_proof_T enc_parity p k n"
-  shows "∀m≤k. p ⊐ enc_parity (parity_vec n m)"
-proof (intro allI impI)
-  fix m assume "m ≤ k"
-  from Pf obtain q u v where
-    Q: "q = parity_vec n k" and
-    P: "p = u @ prefix_block enc_parity q k @ v"
-    unfolding is_proof_T_def by blast
-  have "prefix_block enc_parity q k ⊐ enc_parity (take m q)"
-    using prefix_block_contains_piece[OF ‹m ≤ k›] .
-  then obtain u' v' where
-    "prefix_block enc_parity q k = u' @ enc_parity (take m q) @ v'"
-    unfolding contains_def by blast
-  have step:
-    "p = (u @ u') @ enc_parity (take m q) @ (v' @ v)"
-    using P ‹prefix_block enc_parity q k = u' @ enc_parity (take m q) @ v'› 
-    by force
-  have H1: "p ⊐ enc_parity (take m q)"
-    unfolding contains_def
-    by (intro exI[of _ "u @ u'"] exI[of _ "v' @ v"]) (simp add: step)
-  have H2: "take m q = parity_vec n m"
-    by (simp add: Q ‹m ≤ k› parity_vec_prefix)
-  show "p ⊐ enc_parity (parity_vec n m)"
-    using H1 H2 by simp
-qed
-
 text ‹Encode formulas so that the parity vector appears as a prefix.›
 
 locale Proof_Contains_Formula =
-  fixes is_proof      :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
-  and enc_parity :: "bitstring ⇒ bitstring"
-  and   is_collatz_proof :: "bitstring ⇒ bool"
+  fixes is_proof :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
+    and enc_bit :: "bool ⇒ bitstring"
+    and enc_parity :: "bitstring ⇒ bitstring"
+    and is_collatz_proof :: "bitstring ⇒ bool"
   assumes enc_parity_inj: "inj enc_parity"
+  assumes enc_parity_via_bits:
+    "enc_parity xs = concat (map enc_bit xs)"
+  assumes trace_block:
+    "is_proof p k n ⟹ ∃u v. p = u @ concat (map (λi. enc_bit (odd (Tpow i n))) [0..<k]) @ v"
   assumes sound: "is_proof p k n ⟹ Tpow k n = 1"
-  assumes step_checkable:
-    "is_proof p k n ⟹ ∀i<k. p ⊐ enc_parity [odd (Tpow i n)]"
-  assumes collatz:
-    "is_collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof p k n"
+  assumes collatz: "is_collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof p k n"
 begin
 
 text ‹
@@ -697,6 +672,39 @@ locale PCF_RS = Proof_Contains_Formula + Random_Strings
 context PCF_RS
 
 begin
+
+(* helper: the concatenated trace over [0..<k] contains every prefix [0..<m] *)
+lemma concat_map_prefix_contains:
+  assumes "m ≤ k"
+  shows   "concat (map f [0..<k]) ⊐ concat (map f [0..<m])"
+proof -
+  have "map f [0..<k] = map f [0..<m] @ map f [m..<k]"
+    using assms upt_add_eq_append
+    by (metis append_eq_map_conv le0 less_eqE)
+  then obtain u v where
+    "concat (map f [0..<k]) = u @ concat (map f [0..<m]) @ v"
+    by auto
+  thus ?thesis by (auto simp: contains_def)
+qed
+
+lemma contains_parity_prefixes:
+  assumes Pf: "is_proof p k n"
+  shows "∀m≤k. p ⊐ enc_parity (parity_vec n m)"
+proof (intro allI impI)
+  fix m assume "m ≤ k"
+  from trace_block[OF Pf] obtain u v
+    where P: "p = u @ concat (map (λi. enc_bit (odd (Tpow i n))) [0..<k]) @ v"
+    by blast
+  have trace_has_prefix:
+    "concat (map (λi. enc_bit (odd (Tpow i n))) [0..<k])
+       ⊐ concat (map (λi. enc_bit (odd (Tpow i n))) [0..<m])"
+    using concat_map_prefix_contains[OF ‹m ≤ k›] by simp
+  hence "p ⊐ concat (map (λi. enc_bit (odd (Tpow i n))) [0..<m])"
+    using P
+    by (metis (no_types, lifting) Collatz_Unprovable.contains_def append.assoc)
+  thus "p ⊐ enc_parity (parity_vec n m)"
+    by (simp add: enc_parity_via_bits parity_vec_def o_def)
+qed
 
 lemma card_bitstrings_len:
   "card {s::bitstring. length s = m} = 2 ^ m"
@@ -807,7 +815,7 @@ proof -
 
   (* proof contains *every* prefix encode up to k; take m = Suc L *)
   have "p ⊐ enc_parity (parity_vec n0 ?m)"
-    using step_checkable[OF kpf] k_ge by simp
+    using contains_parity_prefixes[OF kpf] k_ge by simp
   hence "p ⊐ enc_parity t" by (simp add: n0_t)
 
   (* substrings can't be longer than the whole string *)
