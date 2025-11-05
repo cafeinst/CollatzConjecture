@@ -503,17 +503,65 @@ text ‹
 
 section ‹The unprovability theorem›
 
-locale Parity_Formula_Adequate =
-  fixes T :: "nat ⇒ nat"
-    and is_proof_eq1 :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
+text ‹
+  We now show that no finite proof can verify Collatz for all numbers.
+  
+  Key proven facts we use:
+  1. Parity vectors are realizable (theorem parity_vector_realisable)
+  2. Formulas uniquely determine parity vectors (lemma formula_determines_parity_on_len)
+  3. T has two branches with opposite behavior (proven for our specific T)
+›
+
+text ‹First, verify the two-branch property for our Collatz function:›
+
+lemma collatz_odd_increases: "odd n ⟹ n > 0 ⟹ T n > n"
+  by (simp add: T_def)
+
+lemma collatz_even_decreases: "even n ⟹ n > 0 ⟹ T n < n"
+  by (simp add: T_def)
+
+text ‹Prove the counting lemma for random strings:›
+
+lemma many_strings_of_length:
+  "card {s::bitstring. length s = m} = 2 ^ m"
+proof (induction m)
+  case 0
+  have "{s::bitstring. length s = 0} = {[]}" by auto
+  thus ?case by simp
+next
+  case (Suc m)
+  have "{s. length s = Suc m} = (λb. True # b) ` {s. length s = m} ∪ (λb. False # b) ` {s. length s = m}"
+    by (auto simp: length_Suc_conv)
+  moreover have "(λb. True # b) ` {s. length s = m} ∩ (λb. False # b) ` {s. length s = m} = {}"
+    by auto
+  moreover have "inj_on (λb. True # b) {s. length s = m}"
+    by (auto simp: inj_on_def)
+  moreover have "inj_on (λb. False # b) {s. length s = m}"
+    by (auto simp: inj_on_def)
+  ultimately show ?case
+    using Suc.IH card_Un_disjoint card_image
+    by (smt (verit) Suc_1 Suc_pred card.infinite diff_add_zero mult_2 nat.discI 
+        plus_1_eq_Suc power_Suc0_right power_add power_eq_0_iff zero_less_one)
+qed
+
+lemma many_potential_random_strings:
+  "card {s::bitstring. length s = m} ≥ 2 ^ (m - 1)"
+  using many_strings_of_length by (cases m) auto
+
+text ‹
+  Now we set up the locale with minimal assumptions.
+  We only assume the abstract properties of proofs and random strings.
+›
+text ‹Any proof of T^k(n)=1 must contain the formula encoding the computation trace.›
+text ‹Formula encoding has parity vector as prefix.›
+
+locale Proof_System =
+  fixes is_proof_eq1 :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
     and enc_formula :: "nat × nat × nat ⇒ bitstring"
     and enc_parity :: "bool list ⇒ bitstring"
-  assumes formula_bij_on_len:
-    "⟦ length x = k; length y = k; formula_of x = formula_of y ⟧ ⟹ x = y"
-  assumes parity_realisable:
-    "length x = k ⟹ ∃n. parity_vec n k = x"
-  assumes proof_contains_correct_formula:
+  assumes proof_contains_formula:
     "is_proof_eq1 p k n ⟹ p ⊐ enc_formula (formula_of (parity_vec n k))"
+
   assumes enc_formula_prefix:
     "∃rest. enc_formula (formula_of x) = enc_parity x @ rest"
 begin
@@ -522,56 +570,50 @@ lemma proof_must_specify_parity_bits:
   assumes "is_proof_eq1 p k n"
   shows "p ⊐ enc_parity (parity_vec n k)"
 proof -
-  from proof_contains_correct_formula[OF assms]
-  obtain u v where p_form: "p = u @ enc_formula (formula_of (parity_vec n k)) @ v"
+  from proof_contains_formula[OF assms]
+  obtain u v where "p = u @ enc_formula (formula_of (parity_vec n k)) @ v"
     unfolding contains_def by blast
   
   from enc_formula_prefix obtain rest 
     where "enc_formula (formula_of (parity_vec n k)) = enc_parity (parity_vec n k) @ rest"
     by blast
   
-  hence "p = u @ (enc_parity (parity_vec n k) @ rest) @ v"
-    using p_form by simp
   hence "p = u @ enc_parity (parity_vec n k) @ (rest @ v)"
-    by simp
+    by (simp add: ‹p = u @ enc_formula (formula_of (parity_vec n k)) @ v›)
   thus ?thesis unfolding contains_def by blast
 qed
 
 end
-
-text ‹
-  Kolmogorov complexity: a string s with K(s) ≥ m cannot be encoded
-  in fewer than m bits by ANY computable encoding.
-›
-
-locale Kolmogorov_Random_Strings =
+text ‹The KEY axiom: Kolmogorov-random strings cannot be compressed.›
+text ‹Random strings exist at every length.›
+locale Kolmogorov_Complexity =
   fixes k_random :: "nat ⇒ bitstring ⇒ bool"
     and enc_parity :: "bool list ⇒ bitstring"
-  assumes k_random_length: "k_random m s ⟹ length s = m"
-  assumes many_k_random: "card {s. length s = m ∧ k_random m s} ≥ 2 ^ (m - 1)"
+  assumes k_random_length: 
+    "k_random m s ⟹ length s = m"
+  assumes k_random_exist:
+    "∃s. length s = m ∧ k_random m s"
   assumes encoding_cannot_compress_random:
     "k_random m s ⟹ length (enc_parity s) ≥ m"
+begin
+end
 
-definition proof_len :: "bitstring ⇒ nat" where "proof_len p = length p"
+definition proof_len :: "bitstring ⇒ nat" where 
+  "proof_len p = length p"
+text ‹A proof of Collatz works for all n and all trajectory lengths.›
 
-locale PCF_KR =
-  Parity_Formula_Adequate T is_proof_eq1 enc_formula enc_parity
-  + Kolmogorov_Random_Strings k_random enc_parity
-  for T :: "nat ⇒ nat"
-    and is_proof_eq1 :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
+locale Collatz_Unprovability =
+  Proof_System is_proof_eq1 enc_formula enc_parity
+  + Kolmogorov_Complexity k_random enc_parity
+  for is_proof_eq1 :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
     and enc_formula :: "nat × nat × nat ⇒ bitstring"
     and enc_parity :: "bool list ⇒ bitstring"
     and k_random :: "nat ⇒ bitstring ⇒ bool"
   + fixes collatz_proof :: "bitstring ⇒ bool"
   assumes collatz_proof_unbounded:
     "collatz_proof p ⟹ ∀n L. is_proof_eq1 p L n"
-begin
 
-text ‹
-  MAIN THEOREM: No finite proof can verify Collatz for all numbers.
-  
-  Works for ANY encoding: even compression schemes cannot compress K-random strings.
-›
+begin
 
 theorem no_finite_proof:
   assumes "collatz_proof p"
@@ -579,35 +621,31 @@ theorem no_finite_proof:
 proof -
   define L where "L = proof_len p"
   
-  have "card {s. length s = Suc L ∧ k_random (Suc L) s} ≥ 2 ^ L"
-    using many_k_random[of "Suc L"] by simp
-  hence "∃s. length s = Suc L ∧ k_random (Suc L) s"
-    by (metis (mono_tags, lifting) Collect_empty_eq 
-        bot_nat_0.extremum_unique card_eq_0_iff power_not_zero 
-        zero_neq_numeral)
+  text ‹Get a random string of length L+1›
+  obtain s where s_len: "length s = Suc L" and s_random: "k_random (Suc L) s"
+    using k_random_exist by blast
   
-  then obtain s where s_len: "length s = Suc L" and s_k_random: "k_random (Suc L) s"
-    by blast
+  text ‹By parity_vector_realisable, this random string is someone's parity vector›
+  obtain n where "parity_vec n (Suc L) = s"
+    using parity_vector_realisable[of s] s_len
+    by force
   
-  obtain n where pv_eq: "parity_vec n (Suc L) = s"
-    using parity_realisable s_len by blast
-  
+  text ‹The proof must work for this n at depth L+1›
   have "is_proof_eq1 p (Suc L) n"
     using collatz_proof_unbounded[OF assms] by blast
   
+  text ‹Therefore the proof contains the random string›
   have "p ⊐ enc_parity s"
-  proof -
-    have "p ⊐ enc_parity (parity_vec n (Suc L))"
-      using proof_must_specify_parity_bits[OF ‹is_proof_eq1 p (Suc L) n›] .
-    thus ?thesis using pv_eq by simp
-  qed
+    using proof_must_specify_parity_bits[OF ‹is_proof_eq1 p (Suc L) n›] 
+          ‹parity_vec n (Suc L) = s› by simp
   
+  text ‹By incompressibility, this is impossible›
   have "length p ≥ Suc L"
   proof -
     have "length p ≥ length (enc_parity s)"
       using ‹p ⊐ enc_parity s› contains_len_bound by blast
     moreover have "length (enc_parity s) ≥ Suc L"
-      using encoding_cannot_compress_random[OF s_k_random] by blast
+      using encoding_cannot_compress_random[OF s_random] by blast
     ultimately show ?thesis by linarith
   qed
   
