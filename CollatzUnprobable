@@ -3,32 +3,20 @@ theory Collatz_Unprovable
 begin
 
 text ‹
-
-  Formalization of: Feinstein C.A., "The Collatz 3n+1 Conjecture is Unprovable",
-  Global Journal of Science Frontier Research, Mathematics & Decision 
-  Sciences, Volume 12, Issue 8, (2012) 13-15, arXiv:math/0312309 (2003)
-
+  Formalization inspired by: Feinstein C.A., "The Collatz 3n+1 Conjecture is Unprovable",
+  arXiv:math/0312309 (2003)
 
   GOAL: Prove the Collatz conjecture is unprovable using algorithmic information theory.
   
   STRATEGY: Show any finite proof p cannot verify Collatz for all numbers because:
   1. Proofs must encode computational traces (parity vectors)
-  2. Some parity vectors are incompressible (Kolmogorov-random)
-  3. A finite proof cannot contain arbitrarily long incompressible strings
+  2. Some parity vectors are Kolmogorov-random (incompressible)
+  3. A finite proof cannot contain arbitrarily long incompressible encodings
   
   This adapts Chaitin's approach to Gödel's incompleteness theorem.
 ›
 
 section ‹Collatz map and parity vectors›
-
-text ‹
-  The "shortcut" Collatz map combines odd steps:
-  * even step:  n ↦ n div 2
-  * odd step:   n ↦ (3*n + 1) div 2
-  
-  KEY INSIGHT: We record the computational trace as a "parity vector" - 
-  a binary string recording which iterates are odd/even.
-›
 
 definition T :: "nat ⇒ nat" where
   "T n = (if even n then n div 2 else (3*n + 1) div 2)"
@@ -36,58 +24,15 @@ definition T :: "nat ⇒ nat" where
 abbreviation Tpow :: "nat ⇒ nat ⇒ nat"  ("T⇧_ _" [1000,1000] 1000)
   where "Tpow k n ≡ (T ^^ k) n"
 
+section ‹Affine formula characterization›
+
 text ‹
-  The parity vector of length k records the odd/even status of n, T n, ..., T^{k-1} n.
+  The parity vector uniquely determines affine parameters (k,s,c) where T^k(n) = (3^s·n + c)/2^k.
+  This characterization is used by the proof system to encode computational traces.
 ›
+
 definition parity_vec :: "nat ⇒ nat ⇒ bool list"
   where "parity_vec n k = map (λi. odd (Tpow i n)) [0..<k]"
-
-lemma div2_add_double_even_nat:
-  fixes a d :: nat
-  assumes "even a"
-  shows "(a + 2*d) div 2 = a div 2 + d"
-proof -
-  obtain t where A: "a = 2*t" using assms by (elim evenE)
-  show ?thesis by (simp add: A)
-qed
-
-lemma T_add_pow2_even_nat:
-  assumes "even m"
-  shows   "T (m + q * 2 ^ Suc k) = T m + q * 2 ^ k"
-  using assms by (simp add: T_def)
-
-lemma T_add_pow2_odd_nat:
-  assumes "odd m"
-  shows   "T (m + q * 2 ^ Suc k) = T m + 3 * q * 2 ^ k"
-  using assms by (simp add: T_def)
-
-lemma T_add_pow2_even:
-  assumes "even m"
-  shows   "T (m + q * 2^(Suc k)) = T m + q * 2^k"
-proof -
-  obtain t where M: "m = 2*t" using assms by (elim evenE)
-  have "T (m + q * 2^(Suc k)) = (m + q * 2^(Suc k)) div 2" using assms by (simp add: T_def)
-  also have "... = (2*t + q * 2 * 2^k) div 2" by (simp add: M)
-  also have "... = t + q * 2^k" by simp
-  also have "T m = m div 2" using assms by (simp add: T_def)
-  show ?thesis
-  using M ‹T m = m div 2› calculation by fastforce
-qed
-
-lemma T_add_pow2_odd:
-  assumes "odd  m"
-  shows   "T (m + q * 2^(Suc k)) = T m + (3*q) * 2^k"
-proof -
-  have Ev: "even (3*m + 1)" using assms by simp
-  have "T (m + q * 2^(Suc k)) = ((3*(m + q * 2^(Suc k)) + 1) div 2)"
-    using assms by (simp add: T_def)
-  also have "... = ((3*m + 1) + (3*q) * 2^(Suc k)) div 2" by simp
-  also have "... = (3*m + 1) div 2 + (3*q) * 2^k"
-    using div2_add_double_even_nat[OF Ev, of "(3*q) * 2^k"]
-    by simp
-  also have "(3*m + 1) div 2 = T m" using assms by (simp add: T_def)
-  finally show ?thesis by simp
-qed
 
 lemma length_parity_vec[simp]: "length (parity_vec n k) = k"
   by (simp add: parity_vec_def)
@@ -95,12 +40,8 @@ lemma length_parity_vec[simp]: "length (parity_vec n k) = k"
 section ‹Affine formula characterization›
 
 text ‹
-  CRITICAL LEMMA: The parity vector uniquely determines an affine formula:
-    T^k(n) = (3^s * n + c) / 2^k
-  where s counts the odd steps.
-  
-  This means parity vectors are INJECTIVE on fixed length - knowing the formula
-  (k,s,c) tells you the exact parity sequence.
+  The parity vector uniquely determines affine parameters (k,s,c) where T^k(n) = (3^s·n + c)/2^k.
+  This characterization is used by the proof system to encode computational traces.
 ›
 
 fun params :: "nat ⇒ bool list ⇒ nat × nat" where
@@ -143,17 +84,6 @@ lemma mod_drop_left_multiple_nat:
   fixes m a r :: nat
   shows "(m * a + r) mod m = r mod m"
   by (simp add: mod_add_left_eq mod_mult_left_eq)
-
-lemma mod_drop_left_multiple_pow2_suc:
-  fixes i a :: nat
-  shows "(2 ^ Suc i * a + 2 ^ i) mod (2 ^ Suc i) = 2 ^ i"
-  by (simp add: mod_drop_left_multiple_nat)
-     (* uses 2^i < 2^(Suc i) to simplify (2^i) mod (2^(Suc i)) to 2^i *)
-
-lemma mod_drop_left_multiple_twopow_times_two:
-  fixes i k :: nat
-  shows "(k * (2 * 2 ^ i) + 2 ^ i) mod (2 * 2 ^ i) = 2 ^ i"
-  by simp
 
 text ‹The injectivity proof uses modular arithmetic to distinguish parity bits.›
 
@@ -252,36 +182,12 @@ next
   qed
 qed
 
-lemma formula_determines_parity_on_len:
-  assumes "length x = k" "length y = k" "formula_of x = formula_of y"
-  shows   "x = y"
-proof -
-  from assms(3) have "snd (params0 x) = snd (params0 y)" "fst (params0 x) = fst (params0 y)"
-    by (auto simp: formula_of_def)
-  hence "params0 x = params0 y" by (cases "params0 x"; cases "params0 y"; simp)
-  thus ?thesis
-    using assms(1,2) params_injective_len[of x y 0]
-    by (simp add: params0_def)
-qed
-
-section ‹2-adic invariance (crucial for realizability)›
+section ‹2-adic invariance›
 
 text ‹
-  KEY TECHNICAL LEMMA: Adding multiples of 2^k to n preserves the first k parity bits.
-  
-  INTUITION: If two numbers differ by 2^k, they have the same parity. After applying T,
-  the difference becomes a multiple of 2^(k-1), so by induction the property persists.
-  
-  This is the heart of why we can CONSTRUCT numbers with prescribed parity vectors.
+  Adding multiples of 2^k to n preserves the first k parity bits.
+  This is the key to constructing numbers with prescribed parity vectors.
 ›
-
-lemma funpow_Suc_left:
-  "(f ^^ Suc n) x = f ((f ^^ n) x)"
-  by (induction n) simp_all
-
-lemma funpow_Suc_right:
-  "(f ^^ Suc n) x = (f ^^ n) (f x)"
-  by (induction n) simp_all
 
 lemma T_funpow_commute: "T ((T ^^ j) n) = (T ^^ j) (T n)"
 proof (induction j)
@@ -583,36 +489,6 @@ definition contains :: "bitstring ⇒ bitstring ⇒ bool"  (infix "⊐" 50)
 lemma contains_len_bound: "p ⊐ s ⟹ length s ≤ length p"
   by (auto simp: contains_def)
 
-lemma finite_bitstrings_of_len:
-  "finite {s::bitstring. length s = m}"
-proof -
-  have fin_aux:
-    "finite {s::bool list. set s ⊆ (UNIV::bool set) ∧ length s = m}"
-    by (rule finite_lists_length_eq) simp
-  have "{s::bitstring. length s = m}
-        = {s. set s ⊆ (UNIV::bool set) ∧ length s = m}"
-    by auto
-  then show ?thesis using fin_aux by (simp only:)
-qed
-
-lemma finite_bitstrings_le_len:
-  "finite {s::bitstring. length s ≤ m}"
-proof (induction m)
-  case 0 show ?case by (simp add: finite_bitstrings_of_len)
-next
-  case (Suc m)
-  have "{s::bitstring. length s ≤ Suc m}
-      = {s. length s ≤ m} ∪ {s. length s = Suc m}" by auto
-  thus ?case using Suc.IH finite_bitstrings_of_len by (simp add: finite_UnI)
-qed
-
-lemma finite_substrings_of:
-  "finite {s::bitstring. p ⊐ s}"
-proof -
-  have "{s::bitstring. p ⊐ s} ⊆ {s. length s ≤ length p}"
-    using contains_len_bound by auto
-  then show ?thesis using finite_bitstrings_le_len rev_finite_subset by auto
-qed
 
 section ‹The unprovability theorem with arbitrary encodings›
 
@@ -625,55 +501,7 @@ text ‹
   This makes the proof robust against clever encoding schemes.
 ›
 
-locale Proof_Contains_Formula =
-  fixes T :: "nat ⇒ nat"
-    and is_proof_eq1 :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
-    and enc_formula :: "nat × nat × nat ⇒ bitstring"
-    and enc_parity :: "bool list ⇒ bitstring"
-  assumes formula_bij_on_len:
-    "⟦ length x = k; length y = k; formula_of x = formula_of y ⟧ ⟹ x = y"
-  assumes parity_realisable:
-    "length x = k ⟹ ∃n. parity_vec n k = x"
-  assumes proof_contains_correct_formula:
-    "is_proof_eq1 p k n ⟹ p ⊐ enc_formula (formula_of (parity_vec n k))"
-  assumes enc_formula_prefix:
-    "∃rest. enc_formula (formula_of x) = enc_parity x @ rest"
-begin
-
-text ‹
-  Since ‹enc_parity = id› and ‹enc_formula› has ‹enc_parity x› as a prefix,
-  any proof that “contains the formula” necessarily contains the parity bits.
-›
-
-lemma parity_vec_prefix:
-  "m ≤ k ⟹ take m (parity_vec n k) = parity_vec n m"
-  by (simp add: parity_vec_def take_map)
-
-lemma proof_must_specify_parity_bits:
-  assumes "is_proof_eq1 p k n"
-  shows "p ⊐ enc_parity (parity_vec n k)"
-  using assms proof_contains_correct_formula enc_formula_prefix
-  unfolding contains_def
-  by (metis append.assoc)
-
-end
-
 section ‹The unprovability theorem›
-
-text ‹
-  NEW: Kolmogorov complexity abstraction.
-  
-  A string s is "K-random" at level m if its Kolmogorov complexity K(s) ≥ m,
-  meaning it cannot be described/generated by a program shorter than m bits.
-  
-  CRITICAL: The encoding function enc_parity is itself a computable function,
-  so if s is K-random at level m, then enc_parity(s) must have length ≥ m
-  (otherwise enc_parity would compress s, contradicting K(s) ≥ m).
-  Instead, we use Kolmogorov complexity: a parity vector s with K(s) ≥ m
-  cannot be encoded in fewer than m bits by ANY encoding (including enc_parity).
-  
-  This makes the proof robust against clever encoding schemes.
-›
 
 locale Parity_Formula_Adequate =
   fixes T :: "nat ⇒ nat"
@@ -690,21 +518,30 @@ locale Parity_Formula_Adequate =
     "∃rest. enc_formula (formula_of x) = enc_parity x @ rest"
 begin
 
-lemma parity_vec_prefix:
-  "m ≤ k ⟹ take m (parity_vec n k) = parity_vec n m"
-  by (simp add: parity_vec_def take_map)
+lemma proof_must_specify_parity_bits:
+  assumes "is_proof_eq1 p k n"
+  shows "p ⊐ enc_parity (parity_vec n k)"
+proof -
+  from proof_contains_correct_formula[OF assms]
+  obtain u v where p_form: "p = u @ enc_formula (formula_of (parity_vec n k)) @ v"
+    unfolding contains_def by blast
+  
+  from enc_formula_prefix obtain rest 
+    where "enc_formula (formula_of (parity_vec n k)) = enc_parity (parity_vec n k) @ rest"
+    by blast
+  
+  hence "p = u @ (enc_parity (parity_vec n k) @ rest) @ v"
+    using p_form by simp
+  hence "p = u @ enc_parity (parity_vec n k) @ (rest @ v)"
+    by simp
+  thus ?thesis unfolding contains_def by blast
+qed
 
 end
 
 text ‹
-  NEW: Kolmogorov complexity abstraction.
-  
-  A string s is "K-random" at level m if its Kolmogorov complexity K(s) ≥ m,
-  meaning it cannot be described/generated by a program shorter than m bits.
-  
-  CRITICAL: The encoding function enc_parity is itself a computable function,
-  so if s is K-random at level m, then enc_parity(s) must have length ≥ m
-  (otherwise enc_parity would compress s, contradicting K(s) ≥ m).
+  Kolmogorov complexity: a string s with K(s) ≥ m cannot be encoded
+  in fewer than m bits by ANY computable encoding.
 ›
 
 locale Kolmogorov_Random_Strings =
@@ -714,9 +551,6 @@ locale Kolmogorov_Random_Strings =
   assumes many_k_random: "card {s. length s = m ∧ k_random m s} ≥ 2 ^ (m - 1)"
   assumes encoding_cannot_compress_random:
     "k_random m s ⟹ length (enc_parity s) ≥ m"
-    text ‹This is the KEY axiom: Kolmogorov-random strings cannot be compressed
-          by any encoding, including enc_parity. This is the essence of
-          algorithmic information theory.›
 
 definition proof_len :: "bitstring ⇒ nat" where "proof_len p = length p"
 
@@ -731,23 +565,12 @@ locale PCF_KR =
   + fixes collatz_proof :: "bitstring ⇒ bool"
   assumes collatz_proof_unbounded:
     "collatz_proof p ⟹ ∀n L. is_proof_eq1 p L n"
-    (* Changed: proof works for ALL lengths, not just ≥L *)
 begin
 
 text ‹
   MAIN THEOREM: No finite proof can verify Collatz for all numbers.
   
-  The proof now works for ANY encoding scheme:
-  1. Take a Kolmogorov-random parity vector s of length L+1 (K(s) ≥ L+1)
-  2. By realizability, some n has parity_vec n (L+1) = s
-  3. By unboundedness, p must prove T^k(n)=1 for k ≥ L+1
-  4. Therefore p contains enc_parity(s)
-  5. By encoding_cannot_compress_random: |enc_parity(s)| ≥ L+1
-  6. Therefore |p| ≥ L+1
-  7. Contradiction: |p| = L but |p| ≥ L+1
-  
-  This is robust: even if enc_parity uses Huffman coding, arithmetic coding,
-  or any other compression scheme, it cannot compress K-random strings.
+  Works for ANY encoding: even compression schemes cannot compress K-random strings.
 ›
 
 theorem no_finite_proof:
@@ -759,9 +582,9 @@ proof -
   have "card {s. length s = Suc L ∧ k_random (Suc L) s} ≥ 2 ^ L"
     using many_k_random[of "Suc L"] by simp
   hence "∃s. length s = Suc L ∧ k_random (Suc L) s"
-    using card_gt_0_iff
-    by (smt (verit, ccfv_threshold) card.empty equals0I le_0_eq mem_Collect_eq nat.distinct(1) 
-        numeral_2_eq_2 power_eq_0_iff)
+    by (metis (mono_tags, lifting) Collect_empty_eq 
+        bot_nat_0.extremum_unique card_eq_0_iff power_not_zero 
+        zero_neq_numeral)
   
   then obtain s where s_len: "length s = Suc L" and s_k_random: "k_random (Suc L) s"
     by blast
@@ -769,19 +592,16 @@ proof -
   obtain n where pv_eq: "parity_vec n (Suc L) = s"
     using parity_realisable s_len by blast
   
-  text ‹Proof works for length Suc L›
   have "is_proof_eq1 p (Suc L) n"
-    using collatz_proof_unbounded[OF assms, rule_format, of n "Suc L"]
-    by (simp add: assms collatz_proof_unbounded)
+    using collatz_proof_unbounded[OF assms] by blast
   
-  text ‹Therefore p contains enc_parity(s)›
   have "p ⊐ enc_parity s"
-    by (metis (mono_tags, lifting) Proof_Contains_Formula.intro 
-        Proof_Contains_Formula.proof_must_specify_parity_bits 
-        ‹is_proof_eq1 p (Suc L) n› enc_formula_prefix formula_determines_parity_on_len 
-        parity_realisable proof_contains_correct_formula pv_eq)
+  proof -
+    have "p ⊐ enc_parity (parity_vec n (Suc L))"
+      using proof_must_specify_parity_bits[OF ‹is_proof_eq1 p (Suc L) n›] .
+    thus ?thesis using pv_eq by simp
+  qed
   
-  text ‹By incompressibility and substring property›
   have "length p ≥ Suc L"
   proof -
     have "length p ≥ length (enc_parity s)"
