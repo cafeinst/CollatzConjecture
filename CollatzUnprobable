@@ -4,9 +4,11 @@ begin
 
 text ‹
   Formalization inspired by: Feinstein C.A., "The Collatz 3n+1 Conjecture is Unprovable",
-  arXiv:math/0312309 (2003)
+  arXiv:math/0312309, Global Journal of Science Frontier Research, Mathematics & Decision Sciences, 
+  Volume 12, Issue 8, (2012) 13-15
 
-  GOAL: Prove the Collatz conjecture is unprovable using algorithmic information theory.
+
+  GOAL: Prove the Collatz 3n+1 conjecture is unprovable using algorithmic information theory.
   
   STRATEGY: Show any finite proof p cannot verify Collatz for all numbers because:
   1. Proofs must encode computational traces (parity vectors)
@@ -718,7 +720,7 @@ text ‹
   PROOF SYSTEM LOCALE:
   
   This locale formalizes the key assumption about any proof system that claims
-  to verify the Collatz conjecture:
+  to prove the Collatz conjecture:
   
   ASSUMPTION (parity_encoding_principle):
   IF the following four properties hold:
@@ -739,36 +741,12 @@ text ‹
   
   Given these facts, a proof system has no choice but to encode the parity information.
   It cannot use:
-    - General monotonicity arguments (the function both increases and decreases!)
-    - Algebraic simplifications (the formula depends on the specific parity sequence)
-    - Structural analysis (every possible structure is realized by some number)
+    - General monotonicity arguments (since the function both increases and decreases!)
+    - Algebraic simplifications (since the formula depends on the specific parity sequence)
+    - Structural analysis (since every possible structure is realized by some number)
   
   The proof MUST specify which branches are taken, either explicitly (by listing parities)
   or implicitly (by encoding the formula parameters that uniquely determine them).
-  
-  THE OPPOSITE MONOTONICITY ARGUMENT IN DETAIL:
-  
-  Suppose a proof system tries to verify T^k(n) = m without encoding parities.
-  
-  Consider two numbers n1, n2 that differ only in some intermediate parity bit i:
-    - n1 takes the EVEN branch at step i, so T^i(n1) decreases
-    - n2 takes the ODD branch at step i, so T^i(n2) increases
-  
-  After k steps:
-    - T^k(n1) might be less than n1 (because of the decrease at step i)
-    - T^k(n2) might be greater than n2 (because of the increase at step i)
-  
-  The proof cannot distinguish these cases without knowing whether bit i is even or odd!
-  
-  Any general argument about T^k must fail because:
-    - "T^k always decreases" is FALSE (counterexample: n2)
-    - "T^k always increases" is FALSE (counterexample: n1)
-    - "T^k is bounded by f(n)" is USELESS (doesn't determine the exact value m)
-  
-  The only way to determine T^k(n) = m is to know the exact sequence of branches,
-  which is precisely the parity vector.
-  
-  This is why the parity_encoding_principle is a reasonable assumption about any proof system.
 ›
 
 locale Proof_System =
@@ -831,8 +809,6 @@ text ‹
 locale Kolmogorov_Complexity =
   fixes k_random :: "nat ⇒ bitstring ⇒ bool"
     and enc_parity :: "bool list ⇒ bitstring"
-  assumes k_random_length: 
-    "k_random m s ⟹ length s = m"
   assumes k_random_exist:
     "∃s. length s = m ∧ k_random m s"
   assumes encoding_cannot_compress_random:
@@ -846,7 +822,7 @@ text ‹
   
   Combining the Proof System and Kolmogorov Complexity locales:
   
-  THEOREM: No finite proof can verify Collatz for all numbers.
+  THEOREM: No finite proof can prove Collatz for all numbers.
   
   PROOF OUTLINE:
   1. Suppose p is a finite proof of Collatz (length L)
@@ -931,7 +907,7 @@ text ‹
   
   This adapts Chaitin's proof of Gödel's incompleteness theorem to the Collatz context:
   just as no proof system can prove all true statements about Kolmogorov complexity,
-  no proof system can verify Collatz for all numbers whose trajectories have high
+  no proof system can prove Collatz for all numbers whose trajectories have high
   algorithmic complexity.
   
   The opposite monotonicity is essential: it's what prevents algebraic or structural
