@@ -23,7 +23,7 @@ text ‹
   
   This adapts Chaitin's approach to Gödel's incompleteness theorem.
   
-  ═══ THE CORE INSIGHT: OPPOSITE MONOTONICITY ═══
+  ═══ CORE INSIGHT: OPPOSITE MONOTONICITY ═══
   
   The Collatz function has opposite monotonicity in its two branches:
     - Even branch: T(n) = n/2        (DECREASING - n > T(n))
@@ -35,13 +35,13 @@ text ‹
   knowing the exact sequence of even/odd choices (the "parity vector"). 
   
   You CANNOT use:
-  - General monotonicity arguments (function both increases AND decreases!)
-  - Algebraic simplifications (formula depends on specific parity sequence)
-  - Ordering/bounding techniques (sometimes goes up, sometimes down)
+  - General monotonicity arguments (since the function both increases AND decreases!)
+  - Algebraic simplifications (since the formula depends on specific parity sequence)
+  - Ordering/bounding techniques (since the function sometimes goes up, sometimes down)
   
   You MUST know the specific computational trace to predict behavior.
   
-  Therefore, any proof that verifies T^k(n) reaches a certain value must implicitly
+  Therefore, any proof that verifies T^k(n) reaches a certain value must either implicitly
   or explicitly encode the parity information for that trajectory. This forces proofs
   to contain incompressible data, which contradicts finiteness for all numbers.
   
@@ -157,7 +157,7 @@ text ‹
   
   The function params computes (c, s) from a parity vector by simulating the
   accumulated effect of each step:
-    - Each odd step: multiply accumulated value by 3, add 2^i (from 3n+1), increment s
+    - Each odd step: multiply accumulated value c by 3, add 2^i (from 3n+1), increment s
     - Each even step: multiply by 1, add 0 (just divide by 2, no change to numerator)
   
   We work backwards through the list to accumulate these effects.
@@ -179,27 +179,23 @@ definition formula_of :: "bool list ⇒ nat × nat × nat" where
   "formula_of x = (length x, snd (params0 x), fst (params0 x))"  (* (k,s,c) *)
 
 text ‹
-  ═══ INJECTIVITY PROOF: THE KEY LEMMA ═══
+  ═══ STRUCTURAL LEMMA: DIVISIBILITY BY POWERS OF 2 ═══
   
-  THEOREM: The formula parameters uniquely determine the parity vector.
+  This lemma establishes that the constant computed by params is always
+  divisible by the appropriate power of 2:
   
-  This is THE KEY LEMMA for the unprovability argument!
+    2^(Suc i) | fst(params (Suc i) zs)
   
-  PROOF STRATEGY uses modular arithmetic with 2-adic analysis:
-    - Each position i in the parity vector contributes 2^i to c if the bit is TRUE
-    - We can detect this by checking c mod 2^(i+1)
-    - If two parity vectors differ at position i, their c values differ modulo 2^(i+1)
-    - This gives a contradiction, so the vectors must match
+  WHY THIS HOLDS:
+  - Base case: params returns (0, 0), and 0 is divisible by anything
+  - Inductive step: If c is divisible by 2^(Suc (Suc i)), then:
+    * It's also divisible by 2^(Suc i) (since 2^(Suc (Suc i)) = 2 * 2^(Suc i))
+    * Both branches preserve this:
+      - False branch: returns c (already divisible)
+      - True branch: returns 3*c + 2^i (multiplying by odd 3 preserves divisibility)
   
-  WHY THE ODD/EVEN BRANCHES MATTER:
-  The proof critically uses that:
-    1. Powers of 2 (from even steps) are always divisible by 2^(i+1)
-    2. Adding 3·(stuff) + 2^i when odd gives a unique residue mod 2^(i+1)
-    3. These residues distinguish the branches
-  
-  If both branches had the same monotonicity, we might be able to use
-  algebraic simplifications or inequalities. But opposite monotonicity means 
-  we need the exact sequence - no shortcuts possible.
+  This divisibility property is what makes the injectivity proof work: it allows
+  us to detect individual bits by examining residues modulo 2^(Suc i).
 ›
 
 (* Helper lemma: the constant c from params is always divisible by appropriate powers of 2 *)
@@ -240,23 +236,179 @@ lemma mod_drop_left_multiple_nat:
   by (simp add: mod_add_left_eq mod_mult_left_eq)
 
 text ‹
-  ═══ THE INJECTIVITY PROOF ═══
+  ═══ INJECTIVITY PROOF: THE KEY LEMMA ═══
   
-  PROOF OUTLINE:
-  Suppose two parity vectors xs and ys have the same params.
-  We'll show they must be equal by checking each bit position.
+  THEOREM: The formula parameters uniquely determine the parity vector.
   
-  STRATEGY: Proof by contradiction on the first differing bit.
-  - Assume bit i differs: xs[i]=True, ys[i]=False (or vice versa)
-  - Look at the constants c and c' from the tail of each vector
-  - Both are divisible by 2^(Suc i) (by the helper lemma)
-  - But if xs[i]=True: adds 3*c + 2^i (residue 2^i mod 2^(Suc i))
-  - And if ys[i]=False: remains c' (residue 0 mod 2^(Suc i))
-  - Since params are equal, these must be equal, giving 2^i = 0
-  - Contradiction!
+  This is A KEY LEMMA for the unprovability argument!
   
-  This works by checking each bit position modulo 2^(i+1), exploiting the
-  unique residues created by the odd branch formula 3c + 2^i.
+  ═══ UNDERSTANDING THE DIVISIBILITY LEMMA ═══
+
+  ═══ WHY IS c ALWAYS DIVISIBLE BY 2^(Suc i)? ═══
+  
+  Lemma: 2^(Suc i) | fst(params (Suc i) zs)
+  
+  INTUITION: As we work backwards through the parity vector, each position
+  contributes higher powers of 2. The "further away" a position is (higher index),
+  the more powers of 2 it accumulates.
+  
+  ═══ PROOF BY INDUCTION ═══
+  
+  BASE CASE: zs = []
+    params (Suc i) [] = (0, 0)
+    Clearly 2^(Suc i) | 0  ✓
+  
+  INDUCTIVE STEP: zs = b # bs
+    Assume (IH): 2^(Suc (Suc i)) | fst(params (Suc (Suc i)) bs)
+    
+    That is, for the result c from position Suc i onwards:
+      c = 2^(Suc (Suc i)) * t for some t
+    
+    Observation: 2^(Suc (Suc i)) = 2 * 2^(Suc i)
+    So: c = 2^(Suc i) * (2t)
+    Therefore: 2^(Suc i) | c
+    
+    Now params (Suc i) (b # bs) returns:
+      - If b = True:  (3*c + 2^(Suc i), ...)
+      - If b = False: (c, ...)
+    
+    CASE b = False:
+      Result is c, and we just showed 2^(Suc i) | c  ✓
+    
+    CASE b = True:
+      Result is 3*c + 2^(Suc i)
+      Since c = 2^(Suc i) * (2t), we have:
+        3*c = 3 * 2^(Suc i) * (2t) = 2^(Suc i) * (6t)
+      
+      Therefore:
+        3*c + 2^(Suc i) = 2^(Suc i) * (6t) + 2^(Suc i)
+                        = 2^(Suc i) * (6t + 1)
+      
+      So 2^(Suc i) | (3*c + 2^(Suc i))  ✓
+  
+  ═══ THE KEY INSIGHT ═══
+  
+  The lemma works because of a "telescoping" property:
+  
+  - Position i+2 produces a value divisible by 2^(i+3)
+  - Position i+1 uses that value, which is ALSO divisible by 2^(i+2)
+    (since 2^(i+3) = 2 * 2^(i+2))
+  - Position i uses that value, which is ALSO divisible by 2^(i+1)
+    (since 2^(i+2) = 2 * 2^(i+1))
+  
+  Each position "inherits" divisibility by its required power of 2 from the
+  next position, which has even MORE divisibility.
+  
+  ═══ WHY MULTIPLYING BY 3 DOESN'T BREAK DIVISIBILITY ═══
+  
+  This is crucial! When b = True, we multiply c by 3.
+  
+  Question: If 2^k | c, does 2^k | 3*c?
+  Answer: YES! Because 3 is odd.
+  
+  If c = 2^k * t, then:
+    3*c = 3 * 2^k * t = 2^k * (3t)
+  
+  Multiplying by an odd number (3) preserves divisibility by powers of 2.
+  The factor of 3 just gets "absorbed" into the quotient.
+  
+  This is why the Collatz formula (3n+1) works for this proof technique:
+  3 is odd, so the multiplication doesn't interfere with the 2-adic structure.
+  
+  ═══ VISUAL PICTURE ═══
+  
+  Think of building up the constant backwards:
+  
+  Position:  ...  i+2    i+1    i
+  Value:     ...   c₂     c₁    c₀
+  
+  Divisibility guarantees:
+    c₂ divisible by 2^(i+3)  [by IH applied twice]
+    c₁ divisible by 2^(i+2)  [inherits from c₂, since 2^(i+3) = 2*2^(i+2)]
+    c₀ divisible by 2^(i+1)  [inherits from c₁, since 2^(i+2) = 2*2^(i+1)]
+  
+  Each position needs only HALF the divisibility of the next position,
+  and this is automatically satisfied by the recursive structure!
+
+  ═══ PROOF STRATEGY: 2-ADIC ANALYSIS ═══
+  Now that we understand WHY c is divisible by 2^(Suc i), we can use this to
+  prove that different parity vectors yield different formula parameters.
+  
+  The params function builds up the constant c recursively:
+  
+    params i (b # bs) = let (c, s) = params (Suc i) bs in
+                        if b then (3*c + 2^i, Suc s) else (c, s)
+  
+  KEY OBSERVATION: We can detect each bit by examining residues modulo 2^(Suc i).
+  
+  STEP 1: We know c is divisible by 2^(Suc i)
+  
+    From pow2_dvd_fst_params_Suc: 2^(Suc i) | fst(params (Suc i) bs)
+    
+    This means c = 2^(Suc i) * t for some t.
+  
+  STEP 2: Use this to distinguish TRUE vs FALSE bits
+  
+    If bit at position i is TRUE:
+      result = 3*c + 2^i
+      Since c = 2^(Suc i) * t, we have 3*c = 2^(Suc i) * (3t)
+      Therefore: (3*c + 2^i) mod 2^(Suc i) = 2^i
+                 (the 3*c term vanishes mod 2^(Suc i), leaving only 2^i)
+    
+    If bit at position i is FALSE:
+      result = c
+      Therefore: c mod 2^(Suc i) = 0
+                 (since c is divisible by 2^(Suc i))
+  
+    These residues are DIFFERENT: 2^i ≠ 0
+    So we can detect which branch was taken!
+  
+  STEP 3: Prove injectivity by contradiction
+  
+    Suppose two parity vectors xs and ys have the same params but differ at some position.
+    Let i be the first position where they differ (say xs[i]=TRUE, ys[i]=FALSE).
+    
+    Both have the same tail params from positions i+1 onward, so both have the same
+    value c (divisible by 2^(Suc i)).
+    
+    But then:
+      xs contributes: 3*c + 2^i  (residue 2^i mod 2^(Suc i))
+      ys contributes: c          (residue 0 mod 2^(Suc i))
+    
+    Since the overall params are equal, we'd need:
+      3*c + 2^i = c (mod 2^(Suc i))
+      2^i = 0 (mod 2^(Suc i))
+    
+    But 2^i < 2^(Suc i), so 2^i mod 2^(Suc i) = 2^i ≠ 0. Contradiction!
+    
+    Therefore xs and ys must match at every position.
+  
+  ═══ WHY THIS PROOF TECHNIQUE WORKS ═══
+  
+  The key insight is the interplay between:
+  1. Binary structure: positions use powers of 2 (2^0, 2^1, 2^2, ...)
+  2. Collatz structure: odd steps multiply by 3 and add 1
+  3. Modular arithmetic: 3 is odd, so 3 * (even number) stays even
+  
+  Because c is divisible by 2^(Suc i), multiplying by 3 preserves this divisibility.
+  The term 2^i is exactly half of 2^(Suc i), so it creates a "marker" that's
+  detectable modulo 2^(Suc i) but doesn't interfere with later positions.
+  
+  This is pure algebra - it works regardless of the dynamical behavior of T!
+  
+  ═══ RELATION TO UNPROVABILITY ═══
+  
+  This lemma establishes that parity vectors are UNIQUELY encoded by formula parameters.
+  Combined with:
+    - Realizability (every parity vector corresponds to some number)
+    - Opposite monotonicity (proofs can't use shortcuts)
+  
+  We get: proofs must encode specific parity information for each trajectory.
+  Since incompressible parity vectors exist, finite proofs cannot handle all numbers.
+  
+  Note: Injectivity alone doesn't imply unprovability! Even with a modified Collatz
+  where T always decreases, this lemma still holds. But opposite monotonicity is
+  what forces proofs to actually USE this encoded information.
 ›
 
 lemma params_injective_len:
