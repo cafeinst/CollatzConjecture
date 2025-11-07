@@ -1142,8 +1142,8 @@ locale Collatz_Unprovability =
      ⟹ is_proof_eq p k n ⟹ p ⊐ enc_parity (parity_vec n k)"
     and collatz_proof_unbounded:
     "collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof_eq p k n"
-    and enc_parity_no_compression:
-    "∀s. length (enc_parity s) ≥ length s"
+    and enc_parity_prefix_preservation:
+    "⟦k_random m s; take m t = s⟧ ⟹ length (enc_parity t) ≥ m"
 begin
 
 (* Instantiate the parity encoding principle with our proven properties *)
@@ -1321,9 +1321,13 @@ next
     using incompressible_strings_exist[of id m] k_random_def by auto
 next
   show "k_random m s ⟹ length (enc_parity s) ≥ m"
-    using k_random_def enc_parity_no_compression by auto
-    (* If s is k-random of length m, and enc_parity doesn't compress,
-       then |enc_parity(s)| ≥ |s| = m *)
+  proof -
+    assume "k_random m s"
+    then have "length s = m" using k_random_def by simp
+    have "take m s = s" using ‹length s = m› by simp
+    show "length (enc_parity s) ≥ m"
+      using enc_parity_prefix_preservation[OF ‹k_random m s› ‹take m s = s›] by simp
+  qed
 qed
 
 text ‹
@@ -1377,10 +1381,6 @@ lemma k_random_exist:
   "∃s. length s = m ∧ k_random m s"
   using k_random_properties(2) k_random_properties(1) by blast
 
-lemma encoding_cannot_compress_random:
-  "k_random m s ⟹ length (enc_parity s) ≥ m"
-  using k_random_def enc_parity_no_compression by auto
-
 text ‹
   ═══ THE MAIN THEOREM ═══
   
@@ -1391,53 +1391,41 @@ theorem no_finite_proof:
   assumes "collatz_proof p"
   shows False
 proof -
-  (* 1. The proof has some finite length L *)
   define L where "L = proof_len p"
   
-  (* 2. There exists a random string longer than the proof *)
   obtain s where s_len: "length s = Suc L" and s_random: "k_random (Suc L) s"
     using k_random_exist by blast
-    (* By pigeonhole principle, incompressible strings exist *)
   
-  (* 3. By realizability, some number n has this random parity vector *)
   obtain n where pv_eq: "parity_vec n (Suc L) = s"
     using parity_vector_realisable[of s] s_len by auto
-    (* Opposite monotonicity enables this construction! *)
   
-  (* 4. The proof can verify convergence beyond threshold Suc L *)
   have "∃k≥Suc L. is_proof_eq p k n"
     by (simp add: assms collatz_proof_unbounded)
   then obtain k where k_ge: "k ≥ Suc L" and k_proof: "is_proof_eq p k n"
     by blast
-    (* A valid Collatz proof handles all numbers, even those with complex trajectories *)
   
-  (* 5. Therefore the proof contains the parity encoding *)
   have "p ⊐ enc_parity (parity_vec n k)"
     using proof_contains_parity_vector[OF k_proof] by simp
-    (* Opposite monotonicity forces this! The proof can't use shortcuts. *)
   
-  (* 6. Derive the contradiction: proof must be longer than itself *)
   have "length p ≥ Suc L"
   proof -
     have "length p ≥ length (enc_parity (parity_vec n k))"
       using ‹p ⊐ enc_parity (parity_vec n k)› contains_len_bound by blast
-      (* Substring cannot be longer than string *)
-    moreover have "length (enc_parity (parity_vec n k)) ≥ length (parity_vec n k)"
-      using enc_parity_no_compression by blast
-      (* Encoding doesn't compress *)
-    moreover have "length (parity_vec n k) = k"
-      by simp
-      (* Parity vector has length k *)
-    moreover have "k ≥ Suc L"
-      using k_ge by simp
-      (* We have k ≥ L+1 *)
+    moreover have "length (enc_parity (parity_vec n k)) ≥ Suc L"
+    proof -
+      have "take (Suc L) (parity_vec n k) = parity_vec n (Suc L)"
+        using k_ge parity_vec_prefix by auto
+      also have "... = s"
+        using pv_eq by simp
+      finally have prefix: "take (Suc L) (parity_vec n k) = s" .
+      
+      show ?thesis
+        using enc_parity_prefix_preservation[OF s_random prefix] by simp
+    qed
     ultimately show ?thesis by linarith
-      (* Chain: length p ≥ length(enc) ≥ k ≥ L+1 *)
   qed
   
-  (* 7. But length p = L, contradiction! *)
   thus False by (simp add: L_def proof_len_def)
-  (* QED: No finite proof can exist! *)
 qed
 
 end (* End of Collatz_Unprovability locale *)
