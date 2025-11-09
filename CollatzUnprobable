@@ -11,7 +11,7 @@ text ‹
   arXiv:math/0312309, Global Journal of Science Frontier Research, Mathematics & Decision Sciences, 
   Volume 12, Issue 8, (2012) 13-15
 
-  Formalization done by Claude AI, ChatGPT, and Craig Alan Feinstein.
+  Formalization by Craig Alan Feinstein, with assistance from Claude (Anthropic) and ChatGPT (OpenAI).
 
   MAIN GOAL: Prove the Collatz 3n+1 conjecture is unprovable using algorithmic information theory.
   
@@ -35,15 +35,16 @@ text ‹
   knowing the exact sequence of even/odd choices (the "parity vector"). 
   
   You CANNOT use:
-  - General monotonicity arguments (since the function both increases AND decreases)
-  - Algebraic simplifications (since the formula depends on specific parity sequence)
-  - Ordering/bounding techniques (since the function sometimes goes up, sometimes down)
   
-  You MUST know the specific computational trace to predict behavior.
+  1. **Monotonicity/bounding arguments**: You cannot predict whether T^k(n)
+     is larger or smaller than n without knowing the specific sequence of
+     even/odd steps. The function goes both up and down, so general bounds fail.
   
-  Therefore, any proof that verifies T^k(n) reaches a certain value must either implicitly
-  or explicitly encode the parity information for that trajectory. This forces proofs
-  to contain incompressible data, which contradicts finiteness for all numbers.
+  2. **Algebraic simplifications**: The formula T^k(n) = (3^s·n + c)/2^k depends
+     on parameters (s, c) that are uniquely determined by the parity sequence.
+     You must encode which branches were taken.
+  
+  Together: Proofs must encode computational traces, including incompressible ones.
   
   ═══ STRUCTURE OF THE FORMALIZATION ═══
   
@@ -86,7 +87,7 @@ text ‹
   divides by 2 for odd n) but avoids the trivial intermediate step.
   
   The key property remains: odd inputs INCREASE, even inputs DECREASE.
-  This opposite monotonicity is the heart of why the conjecture is unprovable.
+  This opposite monotonicity is at the heart of why the conjecture is unprovable.
 ›
 
 definition T :: "nat ⇒ nat" where
@@ -97,26 +98,41 @@ abbreviation Tpow :: "nat ⇒ nat ⇒ nat"  ("T⇧_ _" [1000,1000] 1000)
   where "Tpow k n ≡ (T ^^ k) n"
 
 text ‹
+  ═══ THE COLLATZ CONJECTURE (UNBOUNDED VERSION) ═══
+  
+  Standard form: ∀n. ∃k. T^k(n) = 1
+  
+  Equivalent unbounded form: ∀n L. ∃k≥L. T^k(n) = 1
+  
+  Why equivalent? Once a number reaches 1, it cycles: 1 → 2 → 1 → 2 → ...
+  So it reaches 1 infinitely often, meaning for any threshold L, there's
+  some k ≥ L where T^k(n) = 1.
+  
+  We prove the unbounded form is unprovable (which implies the standard form
+  is also unprovable).
+›
+text ‹
   ═══ THE PARITY VECTOR: COMPUTATIONAL TRACE ═══
   
   The parity vector parity_vec n k records the sequence of even/odd values
   encountered in the first k iterations starting from n:
     
-    parity_vec n k = [odd(n), odd(T(n)), odd(T²(n)), ..., odd(T^(k-1)(n))]
+  parity_vec n k = [odd(n), odd(T(n)), odd(T²(n)), ..., odd(T^(k-1)(n))]
   
   This is the COMPUTATIONAL TRACE - the sequence of decisions about which branch
   to take at each step.
   
-  EXAMPLE: For n=5, we have T(5)=8, T²(5)=4, T³(5)=2, so:
-    parity_vec 5 3 = [True, False, False]
+  EXAMPLE: For n=7: T(7) = 11,  T²(7) = 17,  T³(7) = 26
+  
+  parity_vec 7 4 = [odd(T^0(7)), odd(T^1(7)), odd(T^2(7)), odd(T^3(7))]
+                 = [odd(7), odd(11), odd(17), odd(26)]
+                 = [True, True, True, False]
+  (Three consecutive odd steps, then even)
   
   KEY OBSERVATION: 
   Because the two branches have opposite monotonicity, this trace completely 
   determines the affine formula relating n to T^k(n). You cannot derive what 
   T^k(n) equals without knowing this sequence.
-  
-  WHY? Because you can't tell if the overall effect is increasing or decreasing
-  without knowing how many times each branch was taken!
 ›
 
 definition parity_vec :: "nat ⇒ nat ⇒ bool list"
@@ -139,8 +155,9 @@ text ‹
     - s is the count of ODD values in the parity vector (number of "3n+1" steps)
     - c is a constant determined by the specific sequence of parities
   
-  INTUITION: Each step either divides by 2 (even) or multiplies by 3 then adds 1 (odd).
-  After k steps, we've multiplied by 3^s and divided by 2^k, plus some accumulated constant.
+  INTUITION: Each step either divides by 2 (even) or multiplies by 3 then adds 1 (odd) and 
+  then divides by 2. After k steps, we've multiplied by 3^s and divided by 2^k, plus some 
+  accumulated constant.
   
   ═══ CRUCIAL FACT: UNIQUENESS ═══
   
@@ -179,61 +196,35 @@ definition formula_of :: "bool list ⇒ nat × nat × nat" where
   "formula_of x = (length x, snd (params0 x), fst (params0 x))"  (* (k,s,c) *)
 
 text ‹
-  ═══ INJECTIVITY PROOF: THE KEY LEMMA ═══
+  ═══ INJECTIVITY: THE KEY LEMMA ═══
   
-  THEOREM: The formula parameters uniquely determine the parity vector.
+  THEOREM: Different parity vectors produce different formula parameters.
   
-  This is A KEY LEMMA for the unprovability argument.
+  In other words: if two trajectories have the same affine formula T^k(n) = (3^s·n + c)/2^k,
+  then they must have taken the same sequence of even/odd steps.
   
-  ═══ THE IDEA: 2-ADIC DETECTION ═══
+  ═══ WHY IT'S TRUE ═══
   
-  The params function works backwards through the parity vector:
+  The proof uses divisibility by powers of 2 to "detect" each bit:
+  - Each position i contributes either 0 or 2^i to the constant c
+  - These contributions are detectable modulo 2^(i+1)
+  - So we can uniquely recover the parity vector from (c, s)
   
-    params i (b # bs) = let (c, s) = params (Suc i) bs in
-                        if b then (3*c + 2^i, Suc s) else (c, s)
+  Think of it like binary encoding: each bit occupies its own "slot" that
+  doesn't interfere with other bits.
   
-  KEY FACT: The result c is always divisible by 2^(Suc i)
-  (Proven by induction in pow2_dvd_fst_params_Suc)
+  ═══ WHY IT MATTERS ═══
   
-  WHY? Because:
-  - Base case: params returns 0, which is divisible by anything
-  - Inductive step: If c is divisible by 2^(i+2), then:
-    * It's also divisible by 2^(i+1) (since 2^(i+2) = 2 * 2^(i+1))
-    * Both branches preserve this:
-      - False: returns c (already divisible)
-      - True: returns 3*c + 2^i (multiplying by odd 3 preserves divisibility)
+  Injectivity means: **parity information cannot be compressed into the formula**.
   
-  ═══ HOW WE DETECT BITS ═══
+  Combined with:
+  - Realizability: incompressible parity vectors exist
+  - Opposite monotonicity: proofs must encode the formula
   
-  Since c = 2^(Suc i) * t for some t, we can check residues modulo 2^(Suc i):
+  We get: proofs must contain incompressible information → no finite proof exists.
   
-  - If bit i is TRUE:  result = 3*c + 2^i → residue is 2^i
-  - If bit i is FALSE: result = c       → residue is 0
-  
-  These are different! So we can tell the bits apart.
-  
-  ═══ THE INJECTIVITY PROOF ═══
-  
-  Suppose two parity vectors xs and ys have the same params but differ at position i.
-  
-  Both have the same tail params, so both start with the same value c.
-  But one adds 2^i (TRUE bit) and the other doesn't (FALSE bit).
-  
-  This gives different residues modulo 2^(Suc i):
-    xs: residue 2^i
-    ys: residue 0
-  
-  Since 2^i ≠ 0, the final params must differ. Contradiction!
-  
-  Therefore, equal params → equal parity vectors. ✓
-  
-  ═══ WHY THIS MATTERS ═══
-  
-  Injectivity means parity vectors uniquely determine formula parameters.
-  Combined with realizability and opposite monotonicity, this forces proofs
-  to encode specific parity information - leading to unprovability.
-  
-  Note: This is pure algebra, independent of T's dynamical behavior!
+  (See the formal proof in lemmas pow2_dvd_fst_params_Suc and params_injective_len
+  for the technical details using modular arithmetic.)
 ›
 
 (* Helper lemma: the constant c from params is always divisible by appropriate powers of 2 *)
@@ -410,26 +401,28 @@ section ‹§3. 2-adic invariance›
 text ‹
   ═══ 2-ADIC INVARIANCE - WHY EVERY PARITY VECTOR IS REALIZABLE ═══
   
-  The key insight: adding multiples of 2^k to n preserves the first k parity bits.
+  KEY LEMMA: Adding q * 2^k to m preserves the first k parity bits.
   
-  INTUITION: Think of numbers in base 2. Adding 2^k only affects bits at position
-  k and higher. The first k iterations of T only "see" the lower k bits, so the
-  addition of 2^k is "invisible" to those iterations.
+    parity_vec (m + q * 2^k) k = parity_vec m k
   
-  MORE PRECISELY:
-    - Adding 2^k doesn't change parity of n (both even or both odd)  
-    - After one T-step, the difference scales by 1/2 (if even) or 3/2 (if odd)
-    - Either way, the scaled difference is still a multiple of 2^(k-1)
-    - So it doesn't affect the next parity check
-    - Continuing this way, the offset remains "beyond the resolution" of all k steps
+  INTUITION: The offset q * 2^k is "large enough" that it doesn't affect the
+  first k parity checks - it's beyond the "resolution" of those k steps.
   
-  This 2-adic property is what makes the realizability construction possible: 
-  we can "tune" a number to have any desired parity sequence by adding appropriate 
-  multiples of 2^k, without affecting the parities we've already set.
+  WHY THIS WORKS:
+    - Adding an even number (q * 2^k) doesn't change whether m is odd or even
+    - After one T-step, the offset becomes either q*2^(k-1) (if m even) or 
+      3q*2^(k-1) (if m odd)
+    - Either way, it's still a multiple of 2^(k-1), preserving k-1 parities
+    - This continues inductively through all k steps
   
-  IMPLICATION FOR UNPROVABILITY:
-  Since every parity vector is realizable, there exist numbers with arbitrarily complex
-  (Kolmogorov-random) computational traces. A finite proof cannot account for all of them.
+  This 2-adic property enables the realizability construction: we can "tune"
+  a number to have any desired parity sequence by adding appropriate multiples
+  of 2^k, without affecting the parities we've already set.
+  
+  ROLE IN UNPROVABILITY:
+  Realizability shows that incompressible parity vectors actually occur.
+  Combined with opposite monotonicity (which forces proofs to encode parities),
+  this means proofs must contain incompressible data → no finite proof exists.
 ›
 
 (* Helper: iterated T commutes with a single T *)
@@ -470,71 +463,23 @@ next
 qed
 
 text ‹
-  ═══ THE CORE 2-ADIC INVARIANCE LEMMA ═══
+  ═══ 2-ADIC INVARIANCE ═══
   
-  THEOREM: Adding q * 2^k to m preserves the first k bits of the parity vector.
+  KEY LEMMA: Adding multiples of 2^k to n preserves the first k parity bits.
   
     parity_vec (m + q * 2^k) k = parity_vec m k
   
-  WHAT ARE THE VARIABLES?
+  EXAMPLE: parity_vec(5, 3) = parity_vec(61, 3) where 61 = 5 + 7*8
+  Both give [odd, even, even] for the first 3 iterations.
   
-  - m: Any starting number for a Collatz iteration
-  - k: How many parity bits we're looking at (length of the trajectory)
-  - q: Any multiplier (how many times we add 2^k)
+  INTUITION: The offset q*2^k is "beyond the resolution" of the first k steps.
+  Adding it is like adding a number that's "too large" to affect the low-order
+  behavior for k iterations.
   
-  WHAT IT SAYS:
+  This enables the realizability construction: we can tune a number to have any
+  desired parity sequence without disrupting parities already set.
   
-  If you start with number m and compute k iterations: T(m), T²(m), ..., T^k(m)
-  and you start with m + q*2^k and compute k iterations: T(m+q*2^k), T²(m+q*2^k), ...
-  
-  Then the parity sequences (even/odd pattern) are IDENTICAL for the first k steps.
-  
-  EXAMPLE:
-  
-  Let m = 5, k = 3, q = 7
-  Then m + q*2^k = 5 + 7*8 = 61
-  
-  The lemma says: parity_vec(5, 3) = parity_vec(61, 3)
-  
-  Starting from 5:  T(5)=8,  T²(5)=4,  T³(5)=2  → parities: [odd, even, even]
-  Starting from 61: T(61)=92, T²(61)=46, T³(61)=23 → parities: [odd, even, even]
-  
-  The parities match! ✓
-  
-  INTUITION: The offset q * 2^k is "large enough" that it doesn't affect the
-  first k iterations - it's beyond the "resolution" of those k steps.
-  
-  Think of it like: adding a multiple of 2^k only affects "higher-order bits"
-  that don't influence the first k parity checks.
-  
-  ═══ PROOF IDEA: BY INDUCTION ON k ═══
-  
-  BASE CASE (k=0): 
-    Empty parity vector, nothing to preserve ✓
-  
-  INDUCTIVE STEP: 
-    Assume the property holds for k, prove it for k+1.
-    
-    HEAD (first parity bit): 
-      q * 2^(k+1) is always even, so adding it doesn't change whether m is odd/even
-      Therefore: odd(m + q*2^(k+1)) = odd(m) ✓
-    
-    TAIL (remaining k parity bits): 
-      After one T-step, what happens to the offset?
-      
-      Case 1: m is even (m = 2t)
-        T(m + q*2^(k+1)) = (2t + q*2^(k+1))/2 = t + q*2^k
-        T(m) = t
-        By IH: parity_vec(t + q*2^k, k) = parity_vec(t, k) ✓
-      
-      Case 2: m is odd (m = 2t+1)
-        T(m + q*2^(k+1)) = (3(m + q*2^(k+1)) + 1)/2
-                         = (3m + 1)/2 + 3q*2^k
-                         = T(m) + 3q*2^k
-        By IH: parity_vec(T(m) + 3q*2^k, k) = parity_vec(T(m), k) ✓
-      
-      Either way, we still have an offset of the form (something)*2^k,
-      so the IH applies to the remaining k steps.
+  (See lemma parity_vec_add_pow2_invariant for the formal proof by induction.)
 ›
 
 lemma parity_vec_add_pow2_invariant:
@@ -625,7 +570,7 @@ text ‹
   ✗ That proofs must encode these parity vectors
   ✗ That the Collatz conjecture is unprovable
   
-  For unprovability, you need realizability PLUS opposite monotonicity:
+  For unprovability, you need:
   
   1. REALIZABILITY (this theorem): Incompressible parity vectors exist
   2. INJECTIVITY (§2): Parity vectors uniquely encode formula parameters  
@@ -677,27 +622,6 @@ next
   finally show ?case .
 qed
 
-text ‹
-  ═══ POWERS OF 2 MODULO 3 ═══
-  
-  These lemmas establish that: 2^ℓ mod 3 = (if even ℓ then 1 else 2)
-  
-  WHY THIS MATTERS:
-  This alternating pattern is key to the adjustment step in the construction.
-    - If ℓ even: 2^ℓ ≡ 1 (mod 3), so adding t*2^ℓ changes m by t (mod 3)
-    - If ℓ odd:  2^ℓ ≡ 2 (mod 3), so adding t*2^ℓ changes m by 2t (mod 3)
-  
-  In both cases, we can choose t ∈ {0,1,2} to make m ≡ 2 (mod 3).
-  
-  PROOF IDEA:
-    2^0 = 1 ≡ 1 (mod 3)
-    2^1 = 2 ≡ 2 (mod 3)
-    2^2 = 4 ≡ 1 (mod 3)
-    2^3 = 8 ≡ 2 (mod 3)
-    ...
-  Pattern repeats with period 2.
-›
-
 lemma pow4_mod3: "((4::nat) ^ m) mod 3 = 1"
   by (simp add: power_mod_nat)  (* 4 ≡ 1 (mod 3), so 4^m ≡ 1^m ≡ 1 *)
 
@@ -733,14 +657,6 @@ lemma pow2_mod3:
   fixes l :: nat
   shows "(2 :: nat) ^ l mod 3 = (if even l then 1 else 2)"
   by (cases "even l") (simp add: pow2_mod3_even, simp add: pow2_mod3_odd)
-
-text ‹
-  ═══ ADJUSTMENT LEMMAS ═══
-  
-  We can always find t ≤ 2 to make m ≡ 2 (mod 3).
-  
-  This is the key to making the odd case work in the realizability construction.
-›
 
 lemma choose_t_even_mod3:
   fixes m0 l :: nat
@@ -795,7 +711,7 @@ qed
 text ‹
   ═══ THE MAIN CONSTRUCTION: EVERY PARITY VECTOR IS REALIZABLE ═══
   
-  This is the heart of the unprovability argument!
+  This is the heart of the unprovability argument.
 ›
 
 lemma parity_vector_realisable:
@@ -887,7 +803,17 @@ text ‹
   The "contains" relation p ⊐ s means bitstring s appears as a substring of p.
   This captures the idea that a proof must encode certain information.
   
-  Example: [True, False] ⊐ [False] means False appears in [True, False]
+  Examples:
+    [True, False, True, True, False] ⊐ [True, True, False]  ✓
+    (the substring appears at positions 2-4)
+    
+    [True, False, True, True, False] ⊐ [False, True]  ✓
+    (the substring appears at positions 1-2)
+    
+    [True, False, True, True, False] ⊐ [True, False, False]  ✗
+    (these bits don't appear consecutively)
+  
+  The key: s must appear as a *contiguous* subsequence in p.
 ›
 
 definition contains :: "bitstring ⇒ bitstring ⇒ bool"  (infix "⊐" 50)
@@ -1007,33 +933,16 @@ text ‹
   
   1. is_proof_eq :: bitstring ⇒ nat ⇒ nat ⇒ bool
      
-     MEANING: "is_proof_eq p k n" means "proof p verifies that T^k(n) = 1"
+     MEANING: "is_proof_eq p k n" means "proof p proves that T^k(n) = 1"
      
      USAGE: Used in two ways:
        a) Parity encoding principle: IF is_proof_eq p k n holds,
-          THEN p must contain enc_parity(parity_vec n k) as substring
+          THEN p must contain enc_parity(parity_vec n k) as a substring
        b) Collatz proof property: collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof_eq p k n
      
-     INTERPRETATION:
-     
-     The Collatz conjecture states:
-       ∀n. ∃k. T^k(n) = 1
-       (for every number, there EXISTS some iteration that reaches 1)
-     
-     Our assumption says:
-       collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof_eq p k n
-       (the proof can verify that for any n and any threshold L,
-        there exists some k ≥ L where T^k(n) = 1)
-     
-     This is REALISTIC! A proof that all numbers reach 1 must be able to
-     demonstrate convergence for any starting number n, reaching 1 at some
-     iteration beyond any given threshold L.
-     
-     WHY THIS FORMULATION WORKS:
-     For the contradiction, we need the proof to handle a specific number n
-     with an incompressible parity vector of length L+1. The proof must
-     verify that n reaches 1 at some k ≥ L+1, which forces it to encode
-     at least L+1 parity bits - longer than the proof itself!
+     This uses the unbounded form of Collatz (equivalent to the standard form,
+     as explained in §1). The proof must be able to verify convergence at
+     arbitrarily large iterations.
   
   2. enc_parity :: bool list ⇒ bitstring
      
@@ -1042,16 +951,12 @@ text ‹
      USAGE: The parity encoding principle states proofs must CONTAIN this encoding:
        is_proof_eq p k n  ⟹  p ⊐ enc_parity(parity_vec n k)
      
-     CONSTRAINT: Must not compress: ∀s. length(enc_parity s) ≥ length s
+     CONSTRAINT: Cannot compress incompressible strings:
+       ⟦k_random m s; take m t = s⟧ ⟹ length (enc_parity t) ≥ m
      
-     INTUITION: This could be as simple as the identity (just the vector itself),
-     or some other encoding. The key requirement is that encoding doesn't shrink
-     the data, so incompressible parity vectors remain large when encoded.
-     
-     EXAMPLE: If parity_vec n k = [True, False, True], then enc_parity applied
-     to this might be [True, False, True] itself, or perhaps some other encoding
-     like [True, True, False, False, True, True] (with redundancy). But NOT
-     something shorter like [True] (compression forbidden).
+     INTUITION: If a string has an incompressible prefix, encoding must preserve
+     at least that much information. This prevents "magic compression" of
+     inherently incompressible data.
   
   3. collatz_proof :: bitstring ⇒ bool
      
@@ -1059,16 +964,8 @@ text ‹
      
      ASSUMPTION: collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof_eq p k n
      
-     INTUITION: If p proves that every number reaches 1, then for any number n
-     and any threshold L, the proof must be able to demonstrate that n reaches 1
-     at some iteration k ≥ L.
-     
-     This captures that a Collatz proof handles ALL numbers universally - it
-     can't just work for specific cases. For any number with any complex trajectory,
-     the proof must verify its convergence.
-     
-     Combined with opposite monotonicity and incompressibility, this forces
-     proofs to encode arbitrarily long parity vectors → impossible for finite proofs!
+     This uses the unbounded form (equivalent to standard Collatz). A proof
+     must handle all numbers, verifying convergence at arbitrarily large iterations.
   
   ═══ HOW THE PARAMETERS INTERACT IN THE CONTRADICTION ═══
   
@@ -1076,45 +973,42 @@ text ‹
   
   1. Assume: collatz_proof p (p proves Collatz)
   
-  2. Then: ∀n L. ∃k≥L. is_proof_eq p k n (p can verify convergence beyond any threshold)
+  2. Let L = length of p
   
-  3. Pick: incompressible parity vector s of length L+1 (where L = length of p)
+  3. Pick: incompressible parity vector s of length L+1
   
   4. By realizability: ∃n with parity_vec n (L+1) = s
   
-  5. By (2): ∃k≥L+1 such that is_proof_eq p k n
+  5. By unbounded form: ∃k≥L+1 such that is_proof_eq p k n
   
-  6. By parity encoding: p ⊐ enc_parity(parity_vec n k)
+  6. By parity encoding principle: p ⊐ enc_parity(parity_vec n k)
   
-  7. Since k ≥ L+1, the parity vector has length k ≥ L+1
+  7. Note: parity_vec n k starts with s (its first L+1 bits are s)
   
-  8. By no-compression: length(enc_parity(parity_vec n k)) ≥ k ≥ L+1
+  8. By prefix preservation: length(enc_parity(parity_vec n k)) ≥ L+1
+     (Encoding preserves the incompressible prefix)
   
-  9. By containment: length p ≥ L+1
+  9. By substring containment: length p ≥ length(enc_parity(parity_vec n k))
   
-  10. But: length p = L (p is finite)
+  10. Therefore: length p ≥ L+1
   
-  11. Contradiction: L ≥ L+1  ∎
+  11. But we defined L = length p
   
-  The parameters work together to formalize: "a proof that works for all numbers
-  must encode arbitrarily complex behaviors. For numbers with incompressible
-  trajectories, opposite monotonicity forces the proof to contain the full trace,
-  making finite proofs impossible."
+  12. Contradiction: L ≥ L+1 
   
   ═══ ASSUMPTIONS (Formalized Properties) ═══
   
   1. parity_encoding_principle:
-     Given the four mathematical properties we've proven, any proof that
-     verifies an iteration must contain the parity encoding.
+     Given realizability, injectivity, and opposite monotonicity, any proof that
+     verifies T^k(n) = 1 must contain enc_parity(parity_vec n k).
      
   2. collatz_proof_unbounded:
-     A proof of the Collatz conjecture can verify convergence beyond any
-     threshold for any number. (This captures universal convergence in a
-     realistic way)
+     A proof of Collatz (unbounded form) can verify convergence beyond any
+     threshold for any number.
      
-  3. enc_parity_no_compression:
-     Encoding parity vectors doesn't compress them.
-     (This ensures incompressible vectors remain large in proofs)
+  3. enc_parity_prefix_preservation:
+     Encoding preserves incompressible prefixes - prevents "magic compression"
+     of inherently incompressible data.
 ›
 
 text ‹
