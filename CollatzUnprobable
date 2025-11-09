@@ -1198,9 +1198,11 @@ qed
 text ‹
   ═══ K-RANDOM STRINGS ═══
   
-  We define k_random using the identity function as our reference encoding.
-  Strings that can't be compressed by id are exactly those where no shorter
-  representation exists - these are our "Kolmogorov-random" strings.
+  Recall: k_random m s means s has length m and cannot be compressed by id.
+  
+  These are our "Kolmogorov-random" strings - bitstrings with no shorter
+  representation. By the pigeonhole argument above, such strings exist for
+  every length m.
 ›
 
 lemma k_random_properties:
@@ -1229,23 +1231,7 @@ text ‹
   THE UNPROVABILITY RESULT
   ═══════════════════════════════════════════════════════════════════════════════
   
-  Combining the Proof System assumptions with our proven incompressibility facts:
-  
-  MAIN THEOREM: No finite proof can verify Collatz for all numbers.
-  
-  ═══ PROOF OUTLINE ═══
-  
-  1. Suppose p is a finite proof (length L)
-  2. Take an incompressible string s of length L+1 (exists by counting argument)
-  3. Find n with parity_vec(n, L+1) = s (exists by realizability)
-  4. The proof can verify ∃k≥L+1. T^k(n) = 1 (by collatz_proof_unbounded)
-  5. So there exists k ≥ L+1 with is_proof_eq p k n
-  6. By opposite monotonicity: p contains enc_parity(parity_vec n k)
-  7. Since k ≥ L+1: length(parity_vec n k) = k ≥ L+1
-  8. By no-compression: length(enc_parity(parity_vec n k)) ≥ k ≥ L+1
-  9. By substring property: length p ≥ length(enc_parity(parity_vec n k))
-  10. Therefore: length p ≥ L+1
-  11. Contradiction: L ≥ L+1
+  (See the locale commentary above for the full proof outline.)
   
   ═══ WHY OPPOSITE MONOTONICITY IS CRUCIAL ═══
   
@@ -1278,7 +1264,7 @@ lemma k_random_exist:
 text ‹
   ═══ THE MAIN THEOREM ═══
   
-  This is the culmination of the entire formalization!
+  This is the culmination of our entire formalization.
 ›
 
 theorem no_finite_proof:
