@@ -108,6 +108,7 @@ text ‹
   We prove the unbounded form is unprovable (which implies the standard form
   is also unprovable).
 ›
+
 text ‹
   ═══ THE PARITY VECTOR: COMPUTATIONAL TRACE ═══
   
@@ -184,30 +185,21 @@ lemma pow2_dvd_fst_params_Suc:
   "2 ^ Suc i dvd fst (params (Suc i) zs)"
 proof (induction zs arbitrary: i)
   case Nil
-  show ?case by simp  (* Base case: params returns (0,0), and 0 is divisible by anything *)
+  show ?case by simp
 next
   case (Cons b bs)
-  (* Extract the recursive result *)
   obtain c s where P: "params (Suc (Suc i)) bs = (c, s)"
     by (cases "params (Suc (Suc i)) bs") auto
-  (* By IH, c is divisible by 2^(Suc (Suc i)) *)
   from Cons.IH[of "Suc i"] P have IH: "2 ^ Suc (Suc i) dvd c" by simp
-  (* Express c as a multiple *)
   then obtain t where c_rep: "c = 2 ^ Suc (Suc i) * t"
     by (auto simp: dvd_def)
-
-  (* Show that c is also divisible by the smaller power 2^Suc i *)
   have div_c: "2 ^ Suc i dvd c"
   proof (unfold dvd_def, intro exI)
     show "c = 2 ^ Suc i * (2 * t)"
-      by (simp add: c_rep)  (* 2^(Suc (Suc i)) = 2^(Suc i) * 2 *)
+      by (simp add: c_rep)
   qed
-
-  (* Now show the result holds after processing the current element *)
   with P show ?case
     by (cases b) simp_all
-    (* If b=True: result is 3*c + 2^i, need to show 2^Suc i | (3*c + 2^i)
-       If b=False: result is c, which we already know is divisible *)
 qed
 
 (* Helper: dropping multiples on the left in modular arithmetic *)
@@ -225,17 +217,14 @@ proof (induction xs arbitrary: ys i)
   then show ?case by (cases ys) auto
 next
   case (Cons a xs)
-  (* ys must also be a cons since lengths match *)
   from Cons.prems(1) obtain b ys' where [simp]: "ys = b # ys'"
     by (cases ys) auto
   
-  (* Get the params of the tails *)
   obtain c s where Pxs: "params (Suc i) xs = (c,s)"
     by (cases "params (Suc i) xs") auto
   obtain c' s' where Pys: "params (Suc i) ys' = (c',s')"
     by (cases "params (Suc i) ys'") auto
 
-  (* The heads combine with the tail params *)
   have Eq:
     "(if a then (3*c + 2^i, Suc s) else (c,s)) =
      (if b then (3*c' + 2^i, Suc s') else (c',s'))"
@@ -245,51 +234,39 @@ next
 
   show ?case
   proof -
-    (* First prove the heads must match *)
     have "a = b"
     proof (rule ccontr)
       assume "a ≠ b"
-      (* One is True, one is False *)
       then consider (TF) "a" "¬ b" | (FT) "¬ a" "b" by auto
       then show False
       proof cases
         case TF
-        (* Case: a=True, b=False
-           This means left is 3*c + 2^i, right is c'
-           But both sides must be equal (from Eq) *)
-        
-        (* Both c and c' are divisible by 2^(Suc i) *)
         from pow2_dvd_fst_params_Suc[of i xs] Pxs have div_c:  "2 ^ Suc i dvd c"  by simp
         from pow2_dvd_fst_params_Suc[of i ys'] Pys have div_c': "2 ^ Suc i dvd c'" by simp
         let ?M = "2 ^ Suc i"
 
-        (* Express as multiples *)
         obtain t  where c_rep:  "c  = ?M * t"  using div_c  by (auto simp: dvd_def)
         obtain t' where c'rep: "c' = ?M * t'" using div_c' by (auto simp: dvd_def)
 
-        (* Left side: (3*c + 2^i) mod 2^(Suc i) = 2^i *)
         have Lmod: "(3 * c + 2 ^ i) mod ?M = 2 ^ i"
         proof -
           have "(3 * c + 2 ^ i) mod ?M
               = ((?M * (3 * t)) + 2 ^ i) mod ?M" by (simp add: c_rep algebra_simps)
           also have "... = (2 ^ i) mod ?M"
-            by (meson mod_drop_left_multiple_nat)  (* multiples of ?M vanish *)
-          also have "... = 2 ^ i" by simp  (* 2^i < 2^(Suc i), so no reduction *)
+            by (meson mod_drop_left_multiple_nat)
+          also have "... = 2 ^ i" by simp
           finally show ?thesis .
         qed
 
-        (* Right side: c' mod 2^(Suc i) = 0 *)
         have Rmod: "c' mod ?M = 0" by (simp add: c'rep)
 
-        (* But Eq says they're equal! *)
         from Eq TF have "(3*c + 2^i, Suc s) = (c', s')" by simp
         hence "(3*c + 2^i) = c'" by simp
         hence "(3*c + 2^i) mod ?M = c' mod ?M" by simp
         hence "2 ^ i = 0" using Lmod Rmod by simp
-        thus False using power_eq_0_iff by fastforce  (* 2^i ≠ 0 *)
+        thus False using power_eq_0_iff by fastforce
       next
         case FT
-        (* Symmetric case: a=False, b=True *)
         from pow2_dvd_fst_params_Suc[of i ys'] Pys have div_c': "2 ^ Suc i dvd c'" by simp
         from pow2_dvd_fst_params_Suc[of i xs]  Pxs have div_c:  "2 ^ Suc i dvd c"  by simp
         let ?M = "2 ^ Suc i"
@@ -297,7 +274,6 @@ next
         obtain t' where c'rep: "c' = ?M * t'" using div_c' by (auto simp: dvd_def)
         obtain t  where c_rep:  "c  = ?M * t"  using div_c  by (auto simp: dvd_def)
 
-        (* Right side: (3*c' + 2^i) mod 2^(Suc i) = 2^i *)
         have Rmod: "(3 * c' + 2 ^ i) mod ?M = 2 ^ i"
         proof -
           have "(3 * c' + 2 ^ i) mod ?M
@@ -308,10 +284,8 @@ next
           finally show ?thesis .
         qed
 
-        (* Left side: c mod 2^(Suc i) = 0 *)
         have Lmod: "c mod ?M = 0" by (simp add: c_rep)
 
-        (* But they must be equal! *)
         from Eq FT have "(c, s) = (3*c' + 2^i, Suc s')" by simp
         hence "c = 3*c' + 2^i" by simp
         hence "c mod ?M = (3*c' + 2^i) mod ?M" by simp
@@ -320,14 +294,10 @@ next
       qed
     qed
 
-    (* Now that we know a = b, the rest follows easily *)
     then have bits_eq: "a = b" by simp
-    (* Since the heads match and the combined results match, the tail params must match *)
     from Eq bits_eq have "c = c' ∧ s = s'" by (cases a) auto
-    (* By IH on the tails *)
     hence "xs = ys'"
       using Cons.IH[OF len_tails] Pxs Pys by metis
-    (* Combine head and tail *)
     with bits_eq show ?thesis by simp
   qed
 qed
@@ -337,12 +307,9 @@ lemma formula_determines_parity_on_len:
   assumes "length x = k" "length y = k" "formula_of x = formula_of y"
   shows   "x = y"
 proof -
-  (* Extract the params from the formula *)
   from assms(3) have "snd (params0 x) = snd (params0 y)" "fst (params0 x) = fst (params0 y)"
     by (auto simp: formula_of_def)
-  (* If both components match, the pairs match *)
   hence "params0 x = params0 y" by (cases "params0 x"; cases "params0 y"; simp)
-  (* Apply injectivity *)
   thus ?thesis
     using assms(1,2) params_injective_len[of x y 0]
     by (simp add: params0_def)
@@ -405,22 +372,18 @@ lemma parity_vec_add_pow2_invariant:
   shows "parity_vec (m + q * 2 ^ k) k = parity_vec m k"
 proof (induction k arbitrary: m q)
   case 0
-  show ?case by (simp add: parity_vec_def)  (* Empty parity vector *)
+  show ?case by (simp add: parity_vec_def)
 next
   case (Suc k)
   let ?Δ = "q * 2 ^ Suc k"
 
-  (* HEAD parity is unchanged: Δ is even, so doesn't affect parity of m *)
   have head: "odd (m + ?Δ) = odd m"
     by simp
 
-  (* TAIL parity-vector is invariant after one T-step *)
   have tail: "parity_vec (T (m + ?Δ)) k = parity_vec (T m) k"
   proof (cases "even m")
     case True
-    (* m = 2t for some t *)
     then obtain t where m2: "m = 2*t" by (elim evenE)
-    (* After adding Δ and dividing by 2, we get t + q*2^k *)
     have "(m + ?Δ) div 2 = t + q * 2 ^ k"
       by (simp add: m2)
     hence "T (m + ?Δ) = t + q * 2 ^ k"
@@ -428,12 +391,10 @@ next
     moreover have "T m = t"
       using True m2 by (simp add: T_def)
     ultimately show ?thesis
-      using Suc.IH[of t q] by simp  (* IH: offset q*2^k preserves k parities *)
+      using Suc.IH[of t q] by simp
   next
     case False
-    (* m = 2t+1 for some t *)
     then obtain t where m2: "m = 2*t + 1" by (elim oddE)
-    (* After 3(m+Δ)+1 and dividing by 2, we get T(m) + 3q*2^k *)
     have "(3*(m + ?Δ) + 1) div 2
           = (3*m + 1) div 2 + (3*q) * 2 ^ k"
     proof -
@@ -446,10 +407,9 @@ next
     hence "T (m + ?Δ) = T m + (3*q) * 2 ^ k"
       using False by (simp add: T_def)
     thus ?thesis
-      using Suc.IH[of "T m" "3*q"] by simp  (* IH: offset 3q*2^k preserves k parities *)
+      using Suc.IH[of "T m" "3*q"] by simp
   qed
   
-  (* Combine head and tail results *)
   have step1: "parity_vec (m + ?Δ) (Suc k)
              = odd (m + ?Δ) # parity_vec (T (m + ?Δ)) k"
     by (simp add: parity_vec_Suc)
@@ -515,7 +475,7 @@ next
 qed
 
 lemma pow4_mod3: "((4::nat) ^ m) mod 3 = 1"
-  by (simp add: power_mod_nat)  (* 4 ≡ 1 (mod 3), so 4^m ≡ 1^m ≡ 1 *)
+  by (simp add: power_mod_nat)
 
 lemma pow2_mod3_even:
   assumes "even l"
@@ -544,7 +504,6 @@ proof -
   finally show ?thesis .
 qed
 
-(* Main result: 2^l alternates between 1 and 2 mod 3 *)
 lemma pow2_mod3:
   fixes l :: nat
   shows "(2 :: nat) ^ l mod 3 = (if even l then 1 else 2)"
@@ -555,20 +514,18 @@ lemma choose_t_even_mod3:
   assumes "even l"
   shows "∃t≤2. (m0 + t * (2 :: nat) ^ l) mod 3 = 2"
 proof -
-  (* Choose t to cancel out m0 mod 3 and give 2 *)
   define t where "t = (2 - (m0 mod 3)) mod 3"
   have t_le2: "t ≤ 2" by (simp add: t_def)
   
-  (* Verify this works *)
   have "(m0 + t * 2 ^ l) mod 3
           = (m0 mod 3 + t * (2 ^ l mod 3)) mod 3"
     by (metis mod_add_cong mod_mod_trivial mod_mult_right_eq)
   also have "... = (m0 mod 3 + t) mod 3"
-    using assms by (simp add: pow2_mod3)  (* 2^l ≡ 1 when l even *)
+    using assms by (simp add: pow2_mod3)
   also have "... = (m0 mod 3 + ((2 - (m0 mod 3)) mod 3)) mod 3"
     by (simp add: t_def)
   also have "... = 2"
-    by (cases "m0 mod 3") simp_all  (* Check all three cases: 0, 1, 2 *)
+    by (cases "m0 mod 3") simp_all
   finally have targ: "(m0 + t * 2 ^ l) mod 3 = 2" .
   from t_le2 targ show ?thesis by blast
 qed
@@ -578,16 +535,14 @@ lemma choose_t_odd_mod3:
   assumes "odd l"
   shows "∃t≤2. (m0 + t * (2 :: nat) ^ l) mod 3 = 2"
 proof -
-  (* Choose t accounting for 2^l ≡ 2 (mod 3) *)
   define t where "t = (2 * (2 - (m0 mod 3))) mod 3"
   have t_le2: "t ≤ 2" by (simp add: t_def)
 
-  (* Verify this works *)
   have "(m0 + t * 2 ^ l) mod 3
           = (m0 mod 3 + t * (2 ^ l mod 3)) mod 3"
     by (metis mod_add_cong mod_mod_trivial mod_mult_right_eq)
   also have "... = (m0 mod 3 + ((2 * (2 - (m0 mod 3))) mod 3) * 2) mod 3"
-    by (simp add: t_def pow2_mod3 assms)  (* 2^l ≡ 2 when l odd *)
+    by (simp add: t_def pow2_mod3 assms)
   also have "... = (m0 mod 3 + (4 * (2 - (m0 mod 3))) mod 3) mod 3"
     using mod_mult_right_eq by (metis (no_types, lifting)
      distrib_right mod_add_eq mod_add_left_eq mult_2_right numeral_Bit0_eq_double)
@@ -600,55 +555,39 @@ proof -
   show ?thesis using t_le2 targ by blast
 qed
 
-text ‹
-  ═══ THE MAIN CONSTRUCTION: EVERY PARITY VECTOR IS REALIZABLE ═══
-  
-  This is the heart of the unprovability argument.
-›
-
 lemma parity_vector_realisable:
   fixes x :: "bool list"
   shows "∃n. parity_vec n (length x) = x"
 proof (induction x)
   case Nil
-  (* Empty parity vector: any number works, we choose 0 *)
   show ?case by (metis length_0_conv length_parity_vec)
 next
   case (Cons b bs)
-  (* By IH, get m0 with the tail parity vector *)
   obtain m0 where IH: "parity_vec m0 (length bs) = bs"
     using Cons.IH by blast
   show ?case
   proof (cases b)
     case False
-    (* ══ WANT EVEN HEAD ══ *)
-    (* Solution: Take n = 2*m0 *)
     let ?n = "2*m0"
     have "parity_vec ?n (length (b # bs))
           = odd ?n # parity_vec (T ?n) (length bs)"
       by (simp add: parity_vec_Suc)
-    also have "... = False # bs" by (simp add: T_def IH)  (* even and T(2m0) = m0 *)
+    also have "... = False # bs" by (simp add: T_def IH)
     also have "... = b # bs" by (simp add: False)
     finally show ?thesis by (intro exI[of _ ?n])
   next
     case True
-    (* ══ WANT ODD HEAD ══ *)
-    (* This is the tricky case! *)
-    
     let ?l = "length bs"
 
-    (* Step 1: Adjust m0 to make it ≡ 2 (mod 3) using 2-adic invariance *)
     obtain t where t_le2: "t ≤ 2" and targ: "(m0 + t * 2 ^ ?l) mod 3 = 2"
       by (cases "even ?l")
          (use choose_t_even_mod3[of ?l m0] choose_t_odd_mod3[of ?l m0] in auto)
 
     let ?m = "m0 + t * 2 ^ ?l"
 
-    (* Step 2: Verify parity vector is preserved after adjustment *)
     have tail_preserved: "parity_vec ?m ?l = bs"
       using IH parity_vec_add_pow2_invariant[of m0 t ?l] by simp
 
-    (* Step 3: Write m = 3*q + 2 using the congruence *)
     define q where "q = ?m div 3"
     have m_eq: "?m = 3*q + 2"
     proof -
@@ -657,11 +596,8 @@ next
       finally show ?thesis .
     qed
 
-    (* Step 4: Define the odd predecessor n such that T(n) = m *)
-    (* For odd n: T(n) = (3n+1)/2 = m, so n = (2m-1)/3 *)
     let ?n = "(2 * ?m - 1) div 3"
 
-    (* Step 5: Verify n is odd *)
     have head: "odd ?n"
     proof -
       have "?n = (2 * (3*q + 2) - 1) div 3" by (simp add: m_eq)
@@ -670,12 +606,9 @@ next
       finally show ?thesis by simp
     qed
 
-    (* Step 6: Verify T(n) = m, so tail parity vector matches *)
     have tail_step: "parity_vec (T ?n) ?l = bs"
       using tail_preserved head by (simp add: m_eq T_def)
-      (* T(2q+1) = (3(2q+1)+1)/2 = (6q+4)/2 = 3q+2 = m *)
 
-    (* Step 7: Combine head and tail *)
     have "parity_vec ?n (length (b # bs)) = odd ?n # parity_vec (T ?n) ?l"
       by (simp add: parity_vec_Suc)
     also have "... = True # bs" using head tail_step by simp
@@ -693,25 +626,11 @@ text ‹
   ═══ SUBSTRING CONTAINMENT ═══
   
   The "contains" relation p ⊐ s means bitstring s appears as a substring of p.
-  This captures the idea that a proof must encode certain information.
-  
-  Examples:
-    [True, False, True, True, False] ⊐ [True, True, False]  ✓
-    (the substring appears at positions 2-4)
-    
-    [True, False, True, True, False] ⊐ [False, True]  ✓
-    (the substring appears at positions 1-2)
-    
-    [True, False, True, True, False] ⊐ [True, False, False]  ✗
-    (these bits don't appear consecutively)
-  
-  The key: s must appear as a *contiguous* subsequence in p.
 ›
 
 definition contains :: "bitstring ⇒ bitstring ⇒ bool"  (infix "⊐" 50)
   where "p ⊐ s ⟷ (∃u v. p = u @ s @ v)"
 
-(* If p contains s, then s cannot be longer than p *)
 lemma contains_len_bound: "p ⊐ s ⟹ length s ≤ length p"
   by (auto simp: contains_def)
 
@@ -721,13 +640,11 @@ lemma collatz_odd_increases:
   assumes "odd n" "n > 0"
   shows "T n > n"
   using assms by (simp add: T_def)
-  (* For n=1: T(1)=2 > 1. For n≥3 odd: (3n+1)/2 > n since 3n+1 > 2n *)
 
 lemma collatz_even_decreases: 
   assumes "even n" "n > 0"
   shows "T n < n"
   using assms by (simp add: T_def)
-  (* n/2 < n for n > 0 *)
 
 (* Finiteness lemmas for counting *)
 
@@ -751,7 +668,6 @@ proof (induction m)
   thus ?case by simp
 next
   case (Suc m)
-  (* Split into strings starting with True vs False *)
   have "{s. length s = Suc m} = (λb. True # b) ` {s. length s = m} ∪ (λb. False # b) ` {s. length s = m}"
     by (auto simp: length_Suc_conv)
   moreover have "(λb. True # b) ` {s. length s = m} ∩ (λb. False # b) ` {s. length s = m} = {}"
@@ -771,194 +687,8 @@ qed
 definition compressible :: "bitstring ⇒ (bitstring ⇒ bitstring) ⇒ bool" where
   "compressible s enc ≡ length (enc s) < length s"
 
-definition k_random :: "nat ⇒ bitstring ⇒ bool" where
-  "k_random m s ≡ length s = m ∧ ¬compressible s id"
-
-text ‹
-  ═══════════════════════════════════════════════════════════════════════════════
-  PROOF SYSTEM LOCALE
-  ═══════════════════════════════════════════════════════════════════════════════
-  
-  This locale formalizes the key assumptions about any proof system that claims
-  to prove the Collatz conjecture.
-  
-  ═══ THE PARITY ENCODING PRINCIPLE ═══
-  
-  ASSUMPTION: If the following four properties hold:
-    1. REALIZABILITY: Every parity vector is realizable by some number
-    2. INJECTIVITY: Parity vectors uniquely determine affine formula parameters
-    3. ODD BRANCH INCREASES: Odd inputs lead to larger values  
-    4. EVEN BRANCH DECREASES: Even inputs lead to smaller values
-  
-  THEN: Any proof that T^k(n) equals some value must contain (as a substring)
-        the encoding of the parity vector for that computation.
-  
-  ═══ WHY THIS IS REASONABLE ═══
-  
-  The four properties establish that:
-    - The trajectory is completely unpredictable without parity information (opposite monotonicity)
-    - The parity vector uniquely determines the computation (injectivity)
-    - Every conceivable parity sequence actually occurs for some number (realizability)
-  
-  Given these facts, a proof system has no choice but to encode the parity information.
-  It cannot use:
-    - General monotonicity arguments (since the function both increases AND decreases)
-    - Algebraic simplifications (since the formula depends on the specific parity sequence)
-    - Structural analysis (since every possible structure is realized by some number)
-  
-  The proof MUST specify which branches are taken, either explicitly (by listing parities)
-  or implicitly (by encoding the formula parameters that uniquely determine them).
-  
-  ═══ LOCALE PARAMETERS (Abstract Proof System Interface) ═══
-  
-  We model three aspects of an arbitrary proof system:
-  
-  1. is_proof_eq :: bitstring ⇒ nat ⇒ nat ⇒ bool
-     
-     MEANING: "is_proof_eq p k n" means "proof p proves that T^k(n) = 1"
-     
-     USAGE: Used in two ways:
-       a) Parity encoding principle: IF is_proof_eq p k n holds,
-          THEN p must contain enc_parity(parity_vec n k) as a substring
-       b) Collatz proof property: collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof_eq p k n
-     
-     This uses the unbounded form of Collatz (equivalent to the standard form,
-     as explained in §1). The proof must be able to verify convergence at
-     arbitrarily large iterations.
-  
-  2. enc_parity :: bool list ⇒ bitstring
-     
-     MEANING: "enc_parity v" is how parity vector v is encoded within proofs
-     
-     USAGE: The parity encoding principle states proofs must CONTAIN this encoding:
-       is_proof_eq p k n  ⟹  p ⊐ enc_parity(parity_vec n k)
-     
-     CONSTRAINT: Cannot compress incompressible strings:
-       ⟦k_random m s; take m t = s⟧ ⟹ length (enc_parity t) ≥ m
-     
-     INTUITION: If a string has an incompressible prefix, encoding must preserve
-     at least that much information. This prevents "magic compression" of
-     inherently incompressible data.
-  
-  3. collatz_proof :: bitstring ⇒ bool
-     
-     MEANING: "collatz_proof p" means "p is a valid proof of the Collatz conjecture"
-     
-     ASSUMPTION: collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof_eq p k n
-     
-     This uses the unbounded form (equivalent to standard Collatz). A proof
-     must handle all numbers, verifying convergence at arbitrarily large iterations.
-  
-  ═══ HOW THE CONTRADICTION WORKS ═══
-  
-  1. Assume collatz_proof p (length L)
-  2. Pick incompressible string s of length L+1
-  3. By realizability, ∃n with parity_vec n (L+1) = s
-  4. By unbounded form, ∃k≥L+1 where is_proof_eq p k n
-  5. By parity encoding, p must contain enc_parity(parity_vec n k)
-  6. Since parity_vec n k has incompressible prefix s, encoding has length ≥L+1
-  7. Contradiction: proof p has length L but must contain string of length ≥L+1
-  
-  ═══ ASSUMPTIONS (Formalized Properties) ═══
-  
-  1. parity_encoding_principle:
-     Given realizability, injectivity, and opposite monotonicity, any proof that
-     verifies T^k(n) = 1 must contain enc_parity(parity_vec n k).
-     
-  2. collatz_proof_unbounded:
-     A proof of Collatz (unbounded form) can verify convergence beyond any
-     threshold for any number.
-     
-  3. enc_parity_prefix_preservation:
-     Encoding preserves incompressible prefixes - prevents "magic compression"
-     of inherently incompressible data.
-›
-
-text ‹
-  ═══ DERIVATION ═══
-  
-  Since we've proven all four properties in the assumptions:
-    1. Realizability: parity_vector_realisable ✓
-    2. Injectivity: formula_determines_parity_on_len ✓  
-    3. Odd increases: collatz_odd_increases ✓
-    4. Even decreases: collatz_even_decreases ✓
-  
-  The parity_encoding_principle applies, so proofs must contain parity information!
-  This is the key step that connects our mathematical theorems to the proof system.
-›
-
-locale Collatz_Unprovability =
-  fixes is_proof_eq :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
-    and enc_parity :: "bool list ⇒ bitstring"
-    and collatz_proof :: "bitstring ⇒ bool"
-  assumes parity_encoding_principle:
-    "⟦∀x. ∃n. parity_vec n (length x) = x;
-      ∀k x y. length x = k ⟶ length y = k ⟶ formula_of x = formula_of y ⟶ x = y;
-      ∀n>0. odd n ⟶ T n > n;
-      ∀n>0. even n ⟶ T n < n⟧
-     ⟹ is_proof_eq p k n ⟹ p ⊐ enc_parity (parity_vec n k)"
-    and collatz_proof_unbounded:
-    "collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof_eq p k n"
-    and enc_parity_prefix_preservation:
-    "⟦k_random m s; take m t = s⟧ ⟹ length (enc_parity t) ≥ m"
-begin
-
-(* Instantiate the parity encoding principle with our proven properties *)
-lemma proof_contains_parity_vector:
-  assumes "is_proof_eq p k n"
-  shows "p ⊐ enc_parity (parity_vec n k)"
-proof -
-  (* Gather the four required properties *)
-  have real: "∀x. ∃n. parity_vec n (length x) = x"
-    using parity_vector_realisable by blast
-  
-  have inj: "∀k x y. length x = k ⟶ length y = k ⟶ formula_of x = formula_of y ⟶ x = y"
-    by (metis formula_determines_parity_on_len)
-  
-  have odd_inc: "∀n>0. odd n ⟶ T n > n"
-    using collatz_odd_increases by auto
-  
-  have even_dec: "∀n>0. even n ⟶ T n < n"
-    using collatz_even_decreases by auto
-  
-  (* Apply the parity encoding principle *)
-  from parity_encoding_principle[OF real inj odd_inc even_dec] assms
-  show ?thesis .
-qed
-
-text ‹
-  ═══════════════════════════════════════════════════════════════════════════════
-  INCOMPRESSIBILITY BY COUNTING
-  ═══════════════════════════════════════════════════════════════════════════════
-  
-  We prove that incompressible strings exist using a simple counting argument.
-  No Kolmogorov complexity theory needed - just the pigeonhole principle!
-  
-  ═══ KEY INSIGHT ═══
-  
-  - There are 2^m bitstrings of length m
-  - There are only 2^m - 1 bitstrings of length < m (sum of 2^0 + 2^1 + ... + 2^(m-1))
-  - Any injective encoding cannot map all 2^m strings to strictly shorter strings
-  
-  Therefore, for any injective encoding, at least one string is incompressible.
-  
-  This gives us the "Kolmogorov-random" strings we need without formalizing
-  Kolmogorov complexity!
-›
-
-lemma card_bitstrings_len:
-  "card {s::bitstring. length s = m} = 2 ^ m"
-proof -
-  have H: "card {s::bool list. set s ⊆ (UNIV::bool set) ∧ length s = m}
-           = (card (UNIV::bool set)) ^ m"
-    using card_lists_length_eq finite 
-    by blast
-  also have "{s::bool list. set s ⊆ (UNIV::bool set) ∧ length s = m}
-           = {s::bitstring. length s = m}"
-    by auto
-  also have "card (UNIV::bool set) = 2" by simp
-  finally show ?thesis by simp
-qed
+definition incompressible_by :: "bitstring ⇒ (bitstring ⇒ bitstring) ⇒ bool" where
+  "incompressible_by s enc ≡ ¬compressible s enc"
 
 (* Sum of geometric series: 2^0 + 2^1 + ... + 2^(m-1) = 2^m - 1 *)
 lemma sum_pow2_lt: "(∑i<m. (2::nat) ^ i) = 2 ^ m - 1"
@@ -979,18 +709,16 @@ lemma card_bitstrings_le_len:
   "card {s::bitstring. length s ≤ m} = (∑i≤m. 2 ^ i)"
 proof -
   let ?S = "λi. {s::bitstring. length s = i}"
-  (* Express as disjoint union *)
   have union_eq: "{s::bitstring. length s ≤ m} = (⋃i∈{..m}. ?S i)" by auto
   have fin_index: "finite ({..m}::nat set)" by simp
   have fin_each: "⋀i. i ≤ m ⟹ finite (?S i)"
     by (simp add: finite_bitstrings_of_len)
   have disj: "⋀i j. i ≤ m ⟹ j ≤ m ⟹ i ≠ j ⟹ ?S i ∩ ?S j = {}"
     by auto
-  (* Cardinality of disjoint union is sum of cardinalities *)
   have "card (⋃i∈{..m}. ?S i) = (∑i∈{..m}. card (?S i))"
     by (rule card_UN_disjoint) (use fin_index fin_each disj in auto)
   also have "... = (∑i∈{..m}. 2 ^ i)"
-    by (simp add: card_bitstrings_len)
+    by (simp add: many_strings_of_length)
   finally show ?thesis
     by (simp add: union_eq)
 qed
@@ -999,35 +727,25 @@ text ‹
   ═══ THE PIGEONHOLE ARGUMENT ═══
   
   THEOREM: For any injective encoding, there exists an incompressible string.
-  
-  PROOF:
-  - Let S = strings of length m (cardinality 2^m)
-  - Let T = strings of length < m (cardinality 2^m - 1)
-  - If all images had length < m, then enc maps S injectively into T
-  - But |S| = 2^m > 2^m - 1 = |T|
-  - Contradiction! (Can't fit more elements into fewer slots)
-  - So some string doesn't compress
 ›
 
-theorem incompressible_strings_exist:
+theorem incompressible_strings_exist_for_enc:
   fixes enc :: "bitstring ⇒ bitstring"
   assumes "inj enc"
-  shows "∃s. length s = m ∧ ¬compressible s enc"
+  shows "∃s. length s = m ∧ incompressible_by s enc"
 proof (cases m)
   case 0
-  (* Empty string cannot compress *)
   have "length ([]::bitstring) = 0 ∧ 0 ≤ length (enc [])"
     by simp
-  then show ?thesis using 0 compressible_def by auto
+  then show ?thesis using 0 incompressible_by_def compressible_def by auto
 next
   case (Suc r)
-  (* Pigeonhole argument *)
   let ?S = "{t::bitstring. length t = Suc r}"
   let ?T = "{u::bitstring. length u ≤ r}"
   have finS: "finite ?S" by (simp add: finite_bitstrings_of_len)
   have finT: "finite ?T" by (simp add: finite_bitstrings_le_len)
   have Sm: "card ?S = 2 ^ Suc r"
-    by (simp add: card_bitstrings_len)
+    by (simp add: many_strings_of_length)
   have Tm: "card ?T = (∑i≤r. 2 ^ i)"
     by (simp add: card_bitstrings_le_len)
   also have "... = (∑i < Suc r. 2 ^ i)"
@@ -1037,65 +755,72 @@ next
     by (simp add: sum_pow2_lt)
   from Sm lt have "card ?T < card ?S" by simp
   
-  (* Pigeonhole: not all images can land in lengths ≤ r *)
   have not_all_shrink: "¬(∀t∈?S. length (enc t) ≤ r)"
   proof
     assume H: "∀t∈?S. length (enc t) ≤ r"
-    (* Then enc maps S into T *)
     have "enc ` ?S ⊆ ?T" using H by auto
     hence "card (enc ` ?S) ≤ card ?T"
       using finT card_mono by blast
-    (* But enc is injective, so |enc(S)| = |S| *)
     moreover from assms finS have "card (enc ` ?S) = card ?S"
       using card_image by (metis subset_UNIV subset_inj_on)
-    (* Contradiction: |S| ≤ |T| but |T| < |S| *)
     ultimately show False using ‹card ?T < card ?S› by linarith
   qed
-  (* So some string doesn't compress *)
+  
   then obtain t where tS: "t ∈ ?S" and len: "¬length (enc t) ≤ r" by blast
   hence "length (enc t) ≥ Suc r" by simp
   moreover from tS have "length t = Suc r" by auto
-  ultimately show ?thesis using Suc compressible_def by auto
-qed
-
-text ‹
-  ═══ K-RANDOM STRINGS ═══
-  
-  Recall: k_random m s means s has length m and cannot be compressed by id.
-  
-  These are our "Kolmogorov-random" strings - bitstrings with no shorter
-  representation. By the pigeonhole argument above, such strings exist for
-  every length m.
-›
-
-lemma k_random_properties:
-  shows "k_random m s ⟹ length s = m"
-    and "∃s. k_random m s"
-    and "k_random m s ⟹ length (enc_parity s) ≥ m"
-proof -
-  show "k_random m s ⟹ length s = m"
-    using k_random_def by simp
-next
-  show "∃s. k_random m s"
-    using incompressible_strings_exist[of id m] k_random_def by auto
-next
-  show "k_random m s ⟹ length (enc_parity s) ≥ m"
-  proof -
-    assume "k_random m s"
-    then have "length s = m" using k_random_def by simp
-    have "take m s = s" using ‹length s = m› by simp
-    show "length (enc_parity s) ≥ m"
-      using enc_parity_prefix_preservation[OF ‹k_random m s› ‹take m s = s›] by simp
-  qed
+  ultimately show ?thesis using Suc incompressible_by_def compressible_def by auto
 qed
 
 text ‹
   ═══════════════════════════════════════════════════════════════════════════════
-  THE UNPROVABILITY RESULT
+  PROOF SYSTEM LOCALE - REVISED
   ═══════════════════════════════════════════════════════════════════════════════
   
-  (See the locale commentary above for the full proof outline.)
+  This locale models the MINIMUM requirements for any proof system attempting
+  to prove the Collatz conjecture. We make three key assumptions that any
+  reasonable proof system must satisfy:
+  
+  1. CONTAINMENT: Proofs must encode parity information
+     (We don't derive this from first principles - we assume it based on
+      realizability, injectivity, and opposite monotonicity)
+  
+  2. INCOMPRESSIBILITY PRESERVATION: The encoding cannot "magically" compress
+     truly incompressible information
+     (This is a basic information-theoretic constraint)
+  
+  3. UNBOUNDED VERIFICATION: A proof of Collatz must work for arbitrarily
+     large iteration counts
+     (This follows from the equivalence of standard and unbounded forms)
+  
+  NOTE: This is a CONDITIONAL unprovability result. We show: IF a proof system 
+  must encode parity information AND preserve incompressibility, THEN no finite 
+  proof exists.
 ›
+
+locale Collatz_Unprovability =
+  fixes enc_parity :: "bool list ⇒ bitstring"
+    and is_proof_of_convergence :: "bitstring ⇒ nat ⇒ nat ⇒ bool"
+    and is_collatz_proof :: "bitstring ⇒ bool"
+  
+  (* ASSUMPTION 1: Proofs must contain encoded parity information *)
+  assumes proof_contains_parity:
+    "is_proof_of_convergence p k n ⟹ p ⊐ enc_parity (parity_vec n k)"
+  
+  (* ASSUMPTION 2: Encoding preserves incompressibility *)
+  assumes encoding_preserves_incompressibility:
+    "⟦incompressible_by s enc_parity; length s = m; take m t = s⟧ 
+     ⟹ length (enc_parity t) ≥ m"
+  
+  (* ASSUMPTION 3: Collatz proofs work for unbounded iterations *)
+  assumes collatz_proof_unbounded:
+    "is_collatz_proof p ⟹ ∀n L. ∃k≥L. is_proof_of_convergence p k n"
+begin
+
+lemma incompressible_parity_encodings_exist:
+  assumes "inj enc_parity"
+  shows "∃s. length s = m ∧ incompressible_by s enc_parity"
+  using incompressible_strings_exist_for_enc[OF assms] .
 
 (* Helper lemmas *)
 
@@ -1109,56 +834,87 @@ lemma parity_vec_prefix:
   shows   "take m (parity_vec n k) = parity_vec n m"
   using assms by (simp add: parity_vec_def take_map)
 
-lemma k_random_exist:
-  "∃s. length s = m ∧ k_random m s"
-  using k_random_properties(2) k_random_properties(1) by blast
-
 text ‹
-  ═══ THE MAIN THEOREM ═══
+  ═══ THE MAIN THEOREM (CONDITIONAL) ═══
   
-  This is the culmination of our entire formalization.
+  Under the three assumptions above, no finite proof of Collatz exists.
+  
+  WHAT THIS PROVES:
+  If proof systems must (1) encode parities, (2) preserve incompressibility,
+  and (3) handle unbounded iterations, then finite proofs are impossible.
+  
+  WHAT THIS DOESN'T PROVE:
+  We don't prove that assumption (1) MUST hold for all proof systems.
+  
+  However, assumption (1) is very reasonable given:
+  - Realizability: every parity sequence occurs for some number
+  - Injectivity: parity sequences uniquely determine formulas
+  - Opposite monotonicity: trajectories are unpredictable without parities
 ›
 
-theorem no_finite_proof:
-  assumes "collatz_proof p"
+theorem no_finite_collatz_proof:
+  assumes "inj enc_parity"
+  assumes "is_collatz_proof p"
   shows False
 proof -
   define L where "L = length p"
   
-  obtain s where s_len: "length s = Suc L" and s_random: "k_random (Suc L) s"
-    using k_random_exist by blast
+  (* By pigeonhole, an incompressible string exists *)
+  obtain s where 
+    s_len: "length s = Suc L" and 
+    s_incomp: "incompressible_by s enc_parity"
+    using incompressible_parity_encodings_exist[OF assms(1), of "Suc L"] by blast
   
+  (* By realizability, this parity vector is realized by some number *)
   obtain n where pv_eq: "parity_vec n (Suc L) = s"
     using parity_vector_realisable[of s] s_len by auto
   
-  have "∃k≥Suc L. is_proof_eq p k n"
-    by (simp add: assms collatz_proof_unbounded)
-  then obtain k where k_ge: "k ≥ Suc L" and k_proof: "is_proof_eq p k n"
+  (* By unbounded form, the proof must handle this number at large iterations *)
+  have "∃k≥Suc L. is_proof_of_convergence p k n"
+    using assms(2) collatz_proof_unbounded by blast
+  then obtain k where 
+    k_ge: "k ≥ Suc L" and 
+    k_proof: "is_proof_of_convergence p k n" 
     by blast
   
+  (* By assumption 1, the proof must contain the encoded parity vector *)
   have "p ⊐ enc_parity (parity_vec n k)"
-    using proof_contains_parity_vector[OF k_proof] by simp
+    using proof_contains_parity[OF k_proof] by simp
   
-  have "length p ≥ Suc L"
-  proof -
-    have "length p ≥ length (enc_parity (parity_vec n k))"
-      using ‹p ⊐ enc_parity (parity_vec n k)› contains_len_bound by blast
-    moreover have "length (enc_parity (parity_vec n k)) ≥ Suc L"
-    proof -
-      have "take (Suc L) (parity_vec n k) = parity_vec n (Suc L)"
-        using k_ge parity_vec_prefix by auto
-      also have "... = s"
-        using pv_eq by simp
-      finally have prefix: "take (Suc L) (parity_vec n k) = s" .
-      
-      show ?thesis
-        using enc_parity_prefix_preservation[OF s_random prefix] by simp
-    qed
-    ultimately show ?thesis by linarith
-  qed
+  (* The parity vector has s as its prefix *)
+  have "take (Suc L) (parity_vec n k) = parity_vec n (Suc L)"
+    using k_ge parity_vec_prefix by auto
+  also have "... = s" using pv_eq by simp
+  finally have prefix: "take (Suc L) (parity_vec n k) = s" .
   
+  (* By assumption 2, encoding s preserves its length *)
+  have enc_large: "length (enc_parity (parity_vec n k)) ≥ Suc L"
+    using encoding_preserves_incompressibility[OF s_incomp s_len prefix] by blast
+  
+  (* But the proof contains this encoding, so must be at least Suc L long *)
+  have "length p ≥ length (enc_parity (parity_vec n k))"
+    using ‹p ⊐ enc_parity (parity_vec n k)› contains_len_bound by blast
+  hence "length p ≥ Suc L" using enc_large by linarith
+  
+  (* Contradiction: L ≥ L + 1 *)
   thus False by (simp add: L_def)
 qed
 
-end (* End of Collatz_Unprovability locale *)
+text ‹
+  ═══ INTERPRETATION ═══
+  
+  This theorem shows that the three assumptions are JOINTLY incompatible
+  with the existence of a finite proof.
+  
+  The assumptions are:
+  1. Proofs encode parities (motivated by realizability + injectivity + opposite monotonicity)
+  2. Encodings preserve incompressibility (basic information theory)
+  3. Proofs handle unbounded iterations (follows from Collatz conjecture's meaning)
+  
+  Therefore, either:
+  - No proof of Collatz exists in systems satisfying these assumptions, OR
+  - Any proof must use fundamentally different techniques that avoid encoding parities directly
+›
+
+end (* End of locale *)
 end (* End of theory *)
