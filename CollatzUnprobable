@@ -814,10 +814,10 @@ text ‹
 
   (2) OPPOSITE MONOTONICITY
 
-      In the true Collatz map, even steps always decrease (n/2 < n) but odd
-      steps always increase ((3*n+1)/2 > n).  Because the size sometimes goes
-      up and sometimes goes down, one cannot understand the behaviour of
-      T^k(n) without knowing exactly which branch was taken at each step.
+      In the true Collatz map, even steps always decrease (n div 2 < n) but odd
+      steps always increase ((3*n + 1) div 2 > n).  Because the size sometimes
+      goes up and sometimes goes down, one cannot understand the behaviour of
+      (T ^^ k) n without knowing exactly which branch was taken at each step.
 
       Contrast:
         The map  T1(n) = (if even n then n div 2 else (n+1) div 2)
@@ -829,7 +829,7 @@ text ‹
 
       For the real Collatz function we have an exact identity
 
-         T^k(n) = (3^s * n + c) / 2^k
+         (T ^^ k) n = (3^s * n + c) div 2^k
 
       where the parameters (k, s, c) depend on the parity vector.  In Section 2
       we proved that these parameters uniquely determine the parity vector.
@@ -841,13 +841,36 @@ text ‹
 
             T4(n) =
               if even n then n div 2
-              else (3*n + 1 + 2^20) div 2
+              else (3*n + 1 + 2^10) div 2
 
         This map still has opposite monotonicity (even steps shrink, odd steps
-        expand), but the extra term 2^20 added at every odd step destroys the
-        injectivity argument.  Distinct parity vectors can yield identical
-        affine parameters, so the parity data is no longer uniquely encoded in
-        the formula.
+        expand), but the extra term 2^10 added at every odd step destroys the
+        injectivity argument.  Each odd step at position i contributes not only
+        a clean term 2^i, but also an additional term 2^(10 - i).  These extra
+        terms overlap in the low-order bits, causing collisions.
+
+        For example, consider parity vectors of length 11 (positions 0..10).
+        Let
+
+           x3 = [False, False, False, True,  False, False, False, False, False, False, False]
+           x7 = [False, False, False, False, False, False, False, True,  False, False, False].
+
+        Vector x3 has a single True at index 3; vector x7 has a single True at
+        index 7 = 10 - 3.  For this modified T4, the constant contributed by an
+        odd step at position i is
+
+           2^i + 2^(10 - i).
+
+        Thus
+
+           c(x3) = 2^3 + 2^7 = 8 + 128 = 136,
+           c(x7) = 2^7 + 2^3 = 128 + 8 = 136.
+
+        Both vectors also have s = 1 odd step and length k = 11, so they yield
+        exactly the same triple (k, s, c) even though x3 ≠ x7.  This shows that
+        adding a fixed 2^10 term causes the affine parameters to lose
+        injectivity, allowing distinct parity vectors to produce identical
+        formulas.
 
   WHY THESE THREE PROPERTIES FORCE PARITY ENCODING
 
@@ -865,7 +888,7 @@ text ‹
       vector.
 
       Since these properties fail for many superficially similar functions,
-      the assumption proof_contains_parity is not arbitrary: it reflects a
+      the assumption ‹proof_contains_parity› is not arbitrary: it reflects a
       genuine structural feature of the actual Collatz dynamics.
 ›
 
