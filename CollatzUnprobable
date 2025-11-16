@@ -59,12 +59,14 @@ text ‹
       - This enables the realizability construction
       
   §4. Every parity vector is realizable
-      - REALIZABILITY: ∀ binary string x, ∃n with parity_vec(n,|x|) = x
-      - Proof uses opposite monotonicity crucially
+      – REALIZABILITY: ∀ binary string x, ∃n with parity_vec(n,|x|) = x
+      – Proof uses 2-adic invariance and an explicit backward construction 
+        along the Collatz map.
       
   §5. Proof system setup
-      - Define bitstrings and substring containment
-      - State dynamic properties (odd increases, even decreases)
+      – Define bitstrings and substring containment
+      – Introduce compressibility/incompressibility for bitstrings
+      – Prove counting lemmas needed for the Kolmogorov-style argument
       
   §6. The unprovability theorem
       - Prove incompressible strings exist (counting argument)
@@ -80,9 +82,6 @@ text ‹
   We define T as the "simplified" Collatz map that divides by 2 in both branches:
     T(n) = n/2        if n is even
     T(n) = (3n+1)/2   if n is odd
-  
-  This is equivalent to the standard Collatz function (which applies 3n+1 then
-  divides by 2 for odd n) but avoids the trivial intermediate step.
 ›
 
 definition T :: "nat ⇒ nat" where
@@ -105,9 +104,7 @@ text ‹
   
   We prove the unbounded form is unprovable (which implies the standard form
   is also unprovable).
-›
 
-text ‹
   ═══ THE PARITY VECTOR: COMPUTATIONAL TRACE ═══
   
   The parity vector parity_vec n k records the sequence of even/odd values
@@ -118,7 +115,7 @@ text ‹
   This is the COMPUTATIONAL TRACE - the sequence of decisions about which branch
   to take at each step.
   
-  EXAMPLE: For n=7: T(7) = 11,  T²(7) = 17,  T³(7) = 26
+  EXAMPLE: For n = 7: T(7) = 11,  T²(7) = 17,  T³(7) = 26
   
   parity_vec 7 4 = [odd(T^0(7)), odd(T^1(7)), odd(T^2(7)), odd(T^3(7))]
                  = [odd(7), odd(11), odd(17), odd(26)]
@@ -144,7 +141,7 @@ text ‹
     - s counts ODD values in the parity vector (number of "3n+1" steps)
     - c is a constant determined by the specific parity sequence
   
-  INTUITION: Each odd step multiplies by 3 (then divides by 2), each even 
+  INTUITION: Each odd step multiplies by 3 and adds 1 then divides by 2, each even 
   step just divides by 2. After k steps: multiply by 3^s, divide by 2^k, 
   plus accumulated constant c.
   
@@ -770,8 +767,9 @@ text ‹
   reasonable proof system must satisfy:
   
   1. CONTAINMENT: Proofs must encode parity information
-     (We don't derive this from first principles - we assume it based on
-      realizability, injectivity, and opposite monotonicity)
+     (We don't derive this from first principles - we assume it based on the 
+      structural properties of the real Collatz function
+      (realizability, injectivity of the affine formula, and opposite monotonicity)
   
   2. INCOMPRESSIBILITY PRESERVATION: The encoding cannot "magically" compress
      truly incompressible information
@@ -781,15 +779,16 @@ text ‹
      large iteration counts
      (This follows from the equivalence of standard and unbounded forms)
   
-  NOTE: This is a CONDITIONAL unprovability result. We show: IF a proof system 
-  must encode parity information AND preserve incompressibility, THEN no finite 
-  proof exists.
+  NOTE: This is therefore a conditional unprovability result:
+  if every valid proof must encode parity vectors and if such encodings must 
+  preserve information-theoretic incompressibility, then no finite proof of the 
+  Collatz conjecture can exist.
 
   ------------------------------------------------------------------------------
   JUSTIFICATION OF ASSUMPTION proof_contains_parity
   ------------------------------------------------------------------------------
 
-  The axiom
+  The assumption
 
       is_proof_of_convergence p k n ⟹ p ⊐ enc_parity (parity_vec n k)
 
@@ -803,50 +802,50 @@ text ‹
   (1) REALIZABILITY OF ALL PARITY VECTORS
 
       For the actual Collatz map, every finite bitstring x occurs as a parity
-      vector.  This means a proof of universal convergence must handle all
+      vector. This means a proof of universal convergence must handle all
       possible parity-patterns; none can be excluded.
 
       Contrast:
-        The map  T2(n) = (if even n then n div 2 else n + 1)
-      is not realizable: after an odd step the next value is always even, so
-      the pattern [True, True] never occurs.  Proofs for T2 do not need to
+        The map T1(n) = (if n is even then n/2 else n + 1)
+      is not realizable: after an odd step, the next value is always even, so
+      the pattern [True, True] never occurs. Proofs for T1 do not need to
       consider arbitrary bitstrings.
 
   (2) OPPOSITE MONOTONICITY
 
-      In the true Collatz map, even steps always decrease (n div 2 < n) but odd
-      steps always increase ((3*n + 1) div 2 > n).  Because the size sometimes
+      In the true Collatz map, even steps always decrease (n/2 < n) but odd
+      steps always increase ((3*n + 1)/2 > n). Because the size sometimes
       goes up and sometimes goes down, one cannot understand the behaviour of
       (T ^^ k) n without knowing exactly which branch was taken at each step.
 
       Contrast:
-        The map  T1(n) = (if even n then n div 2 else (n+1) div 2)
-      has no opposite monotonicity: both branches decrease for n > 1.
-      Convergence of T1 can be proved using a global monotone invariant,
-      without ever referring to individual parity choices.
+        The map T2(n) = (if n is even then n/2 else (n + 1)/2) has no opposite 
+      monotonicity: both branches decrease for n > 1. Convergence of T2 can be 
+      proved using a global monotone invariant, without ever referring to 
+      individual parity choices.
 
   (3) INJECTIVITY OF THE AFFINE FORMULA
 
-      For the real Collatz function we have an exact identity
+      For the real Collatz function, we have an exact identity
 
-         (T ^^ k) n = (3^s * n + c) div 2^k
+         (T ^^ k) n = (3^s * n + c) / 2^k
 
-      where the parameters (k, s, c) depend on the parity vector.  In Section 2
+      where the parameters (k, s, c) depend on the parity vector. In Section 2
       we proved that these parameters uniquely determine the parity vector.
-      Thus any reasoning that uses the affine formula automatically determines
-      the parity pattern.
+      Thus, any argument that relies on the affine formula is already implicitly 
+      determining the full parity vector.
 
       Contrast:
         Consider the map
 
-            T4(n) =
-              if even n then n div 2
-              else (3*n + 1 + 2^10) div 2
+            T3(n) =
+              if n is even then n/2
+              else (3*n + 1 + 2^10)/2
 
         This map still has opposite monotonicity (even steps shrink, odd steps
         expand), but the extra term 2^10 added at every odd step destroys the
-        injectivity argument.  Each odd step at position i contributes not only
-        a clean term 2^i, but also an additional term 2^(10 - i).  These extra
+        injectivity argument. Each odd step at position i contributes not only
+        a clean term 2^i, but also an additional term 2^(10 - i). These extra
         terms overlap in the low-order bits, causing collisions.
 
         For example, consider parity vectors of length 11 (positions 0..10).
@@ -856,7 +855,7 @@ text ‹
            x7 = [False, False, False, False, False, False, False, True,  False, False, False].
 
         Vector x3 has a single True at index 3; vector x7 has a single True at
-        index 7 = 10 - 3.  For this modified T4, the constant contributed by an
+        index 7 = 10 - 3.  For this modified T3, the constant contributed by an
         odd step at position i is
 
            2^i + 2^(10 - i).
@@ -888,7 +887,7 @@ text ‹
       vector.
 
       Since these properties fail for many superficially similar functions,
-      the assumption ‹proof_contains_parity› is not arbitrary: it reflects a
+      the assumption proof_contains_parity is not arbitrary: it reflects a
       genuine structural feature of the actual Collatz dynamics.
 ›
 
@@ -926,19 +925,24 @@ lemma parity_vec_prefix:
 text ‹
   ═══ THE MAIN THEOREM (CONDITIONAL) ═══
   
-  Under the three assumptions above, no finite proof of Collatz exists.
+  Under the three assumptions above, no finite proof of the Collatz
+  conjecture can exist.
   
   WHAT THIS PROVES:
-  If proof systems must (1) encode parities, (2) preserve incompressibility,
-  and (3) handle unbounded iterations, then finite proofs are impossible.
+    If a proof system must 
+    (1) encode parity information,
+    (2) preserve incompressibility, and
+    (3) verify convergence for arbitrarily large iteration counts,
+    then a finite proof of the Collatz conjecture is impossible.
   
-  WHAT THIS DOESN'T PROVE:
-  We don't prove that assumption (1) MUST hold for all proof systems.
-  
-  However, assumption (1) is very reasonable given:
-  - Realizability: every parity sequence occurs for some number
-  - Injectivity: parity sequences uniquely determine formulas
-  - Opposite monotonicity: trajectories are unpredictable without parities
+  WHAT THIS DOES NOT PROVE:
+    We do not claim that every conceivable proof system must satisfy
+    assumption (1). Rather, assumption (1) is motivated by the structural
+    properties of the actual Collatz map—specifically, realizability of all
+    parity vectors, opposite monotonicity (odd steps increase while 
+    even steps decrease), and injectivity of the affine formula. These 
+    features make it natural to treat parity data as essential computational 
+    information.
 ›
 
 theorem no_finite_collatz_proof:
@@ -992,17 +996,15 @@ qed
 text ‹
   ═══ INTERPRETATION ═══
   
-  This theorem shows that the three assumptions are JOINTLY incompatible
-  with the existence of a finite proof.
-  
-  The assumptions are:
-  1. Proofs encode parities (motivated by realizability + injectivity + opposite monotonicity)
-  2. Encodings preserve incompressibility (basic information theory)
-  3. Proofs handle unbounded iterations (follows from Collatz conjecture's meaning)
+  The theorem shows that assumptions (1)–(3) are jointly incompatible with
+  the existence of any finite proof of the Collatz conjecture.
   
   Therefore, either:
-  - No proof of Collatz exists in systems satisfying these assumptions, OR
-  - Any proof must use fundamentally different techniques that avoid encoding parities directly
+  
+    • No proof of Collatz exists within systems satisfying these assumptions, or
+  
+    • Any successful proof must avoid methods that force the implicit
+      encoding of full parity information for long trajectories.
 ›
 
 end (* End of locale *)
