@@ -835,42 +835,6 @@ text ‹
       Thus, any argument that relies on the affine formula is already implicitly 
       determining the full parity vector.
 
-      Contrast:
-        Consider the map
-
-            T3(n) =
-              if n is even then n/2
-              else (3*n + 1 + 2^10)/2
-
-        This map still has opposite monotonicity (even steps shrink, odd steps
-        expand), but the extra term 2^10 added at every odd step destroys the
-        injectivity argument. Each odd step at position i contributes not only
-        a clean term 2^i, but also an additional term 2^(10 - i). These extra
-        terms overlap in the low-order bits, causing collisions.
-
-        For example, consider parity vectors of length 11 (positions 0..10).
-        Let
-
-           x3 = [False, False, False, True,  False, False, False, False, False, False, False]
-           x7 = [False, False, False, False, False, False, False, True,  False, False, False].
-
-        Vector x3 has a single True at index 3; vector x7 has a single True at
-        index 7 = 10 - 3.  For this modified T3, the constant contributed by an
-        odd step at position i is
-
-           2^i + 2^(10 - i).
-
-        Thus
-
-           c(x3) = 2^3 + 2^7 = 8 + 128 = 136,
-           c(x7) = 2^7 + 2^3 = 128 + 8 = 136.
-
-        Both vectors also have s = 1 odd step and length k = 11, so they yield
-        exactly the same triple (k, s, c) even though x3 ≠ x7.  This shows that
-        adding a fixed 2^10 term causes the affine parameters to lose
-        injectivity, allowing distinct parity vectors to produce identical
-        formulas.
-
   WHY THESE THREE PROPERTIES FORCE PARITY ENCODING
 
       The true Collatz function is special in that it satisfies all three
