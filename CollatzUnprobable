@@ -3,7 +3,7 @@ theory CollatzUnprovable
 begin
 
 text \<open>
-\section{Formalisation of Collatz Conjecture Unprovability}
+\section{Information--Theoretic Barriers for Collatz Proofs}
 
 \subsection*{Provenance}
 This formalisation is inspired by:
@@ -13,54 +13,70 @@ arXiv:math/0312309; \emph{Global Journal of Science Frontier Research},
 Mathematics and Decision Sciences, Volume 12, Issue 8 (2012), 13--15.
 \end{quote}
 
+The present development should be understood as a formal exploration and
+refinement of certain information--theoretic ideas appearing in that work,
+rather than as a claim of absolute unprovability.
+
 The author of this formalisation received assistance from two AI systems ---
 ChatGPT (OpenAI) and Claude (Anthropic). Their assistance consisted of drafting
 and refining explanatory text, improving the readability of the introduction
 and comments, and helping diagnose or structure Isabelle/HOL proof scripts.
 
 \subsection*{Main goal}
-Prove that the Collatz $3n+1$ conjecture has no finite proof in any proof system
-satisfying certain information-theoretic assumptions, using algorithmic
-information theory.
+The goal of this theory is to formalise an \emph{information--theoretic barrier}
+for a broad and natural class of proof strategies for the Collatz $3n+1$
+conjecture.  In particular, we show that no \emph{finite proof} can exist within
+any proof system that satisfies certain explicit assumptions about how
+computational trace information is represented and preserved.
+
+This result is conditional and does not claim that the Collatz conjecture is
+unprovable in an absolute or Gödelian sense.
 
 \subsection*{High-level strategy}
-Show that any finite proof $p$ cannot verify Collatz for all numbers because:
+The argument formalised here isolates the following phenomenon:
+
 \begin{enumerate}
-\item Proofs must encode computational traces (parity vectors).
-\item Some parity vectors are Kolmogorov-random (incompressible).
-\item A finite proof cannot contain arbitrarily long incompressible encodings.
+\item Certain proof strategies must expose or encode complete computational
+      traces of the Collatz iteration (parity vectors).
+\item The Collatz map realises parity vectors of arbitrary length, including
+      information--theoretically incompressible ones.
+\item Under mild and explicit assumptions on how proofs encode information,
+      a finite proof cannot accommodate arbitrarily long incompressible traces.
 \end{enumerate}
-This adapts Chaitin's approach to G\"odel's incompleteness theorem.
+
+The structure of the argument is inspired by Chaitin--style incompressibility
+methods, but is applied here to the \emph{shape of proof certificates} rather
+than to the computation of specific strings.
 
 \subsection*{Structure of the formalisation}
 \begin{description}
 \item[1. Collatz map and parity vectors]
-Define the simplified Collatz function $T$.
-Define $\textit{parity\_vec}$ as the computational trace.
+We define the simplified Collatz function $T$ and formalise parity vectors as
+computational traces of the iteration.
 
 \item[2. Affine formula characterisation]
-Show that $T^k(n) = (3^s \cdot n + c) / 2^k$ for unique parameters $(k,s,c)$.
-Prove injectivity: parity vectors uniquely determine the affine parameters.
+We show that $T^k(n)$ admits an affine representation
+$(3^s \cdot n + c) / 2^k$, and prove that the parameters $(k,s,c)$ are uniquely
+determined by the parity vector.
 
-\item[3. Two-adic invariance]
-Key lemma: adding $2^k$ to $n$ preserves the first $k$ parity bits.
-This enables the realisability construction.
+\item[3. Two--adic invariance]
+We establish a key invariance property: adding $2^k$ to a starting value does
+not affect the first $k$ parity bits.  This property underlies the
+realisability construction.
 
 \item[4. Every parity vector is realisable]
-Realisability: for every finite binary string $x$, there exists $n$ such that
-$\textit{parity\_vec}(n,|x|) = x$.
-The proof uses two-adic invariance and an explicit backward construction along
-the Collatz map.
+We prove that every finite binary string occurs as the parity vector of some
+starting value.  This shows that arbitrarily complex computational traces are
+inherent to the Collatz dynamics.
 
 \item[5. Proof system setup]
-Define bitstrings and substring containment.
-Introduce compressibility and incompressibility for bitstrings.
-Prove counting lemmas needed for the Kolmogorov-style argument.
+We introduce an abstract model of proof certificates based on bitstrings,
+substring containment, and information--theoretic compressibility.
 
-\item[6. The unprovability theorem]
-Prove that incompressible strings exist by a counting argument.
-Construct the locale with proof-system assumptions.
-Derive the main theorem: no finite proof exists.
+\item[6. A trace--based barrier theorem]
+Under explicit assumptions on trace containment, incompressibility
+preservation, and unbounded verification, we derive a formal barrier result:
+no finite proof exists \emph{within this class of proof systems}.
 \end{description}
 \<close>
 
@@ -106,7 +122,7 @@ iteration enters the cycle
 and therefore reaches $1$ infinitely many times. Consequently, for any
 threshold $L$, there exists some $k \ge L$ such that $T^k(n) = 1$.
 
-In this development, we prove that the unbounded formulation is unprovable.
+In this development, we show that the unbounded formulation is unprovable.
 This implies that the standard formulation is also unprovable.
 
 \subsection*{The parity vector as computational trace}
