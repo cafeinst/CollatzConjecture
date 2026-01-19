@@ -1,4 +1,4 @@
-theory CollatzUnprovable
+theory Collatz_Information_Barriers
   imports Main
 begin
 
