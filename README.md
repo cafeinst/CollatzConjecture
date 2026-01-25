@@ -10,7 +10,3 @@ methods and proves statements only within those assumptions.
 The formalization is based on ideas from the paper:
 Craig Alan Feinstein, “The Collatz 3n+1 Conjecture is Unprovable,”
 arXiv:math/0312309.
-
-If you use or reference this development, please cite: Craig Alan Feinstein, 
-*Isabelle formalization of Collatz information barriers*, Zenodo, 2026.
-DOI: https://doi.org/10.5281/zenodo.18294793
