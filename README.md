@@ -1,4 +1,4 @@
-DOI: 10.5281/zenodo.18294793
+DOI: 10.5281/zenodo.18364577
 
 Collatz_Information_Barriers contains an Isabelle/HOL theory file formalizing
 conditional results related to information-theoretic limitations of certain
