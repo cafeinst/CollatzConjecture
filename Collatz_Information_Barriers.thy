@@ -1,9 +1,30 @@
-theory Collatz_Information_Barriers
-  imports Main
-begin
-
 text \<open>
-\section{Information--Theoretic Barriers for Collatz Proofs}
+\section*{Information--Theoretic Barriers for Collatz Proofs}
+
+\begin{center}
+{\Large Craig A. Feinstein}
+
+\vspace{0.5em}
+
+Machine-Checked Formalization in Isabelle/HOL
+\end{center}
+
+\subsection*{Abstract}
+
+We formalise several structural properties of the Collatz map, including
+the affine characterisation of iterates, two-adic invariance of parity
+vectors, and the realisability of arbitrary finite parity traces.
+Building on these results, we define an abstract class of proof systems
+that represent computational trace information explicitly. Under
+assumptions of trace containment, incompressibility preservation, and
+unbounded verification, we prove that no finite proof certificate can
+establish the required convergence property within this class of proof
+systems. The result is conditional and should be interpreted as a
+formal barrier theorem rather than a claim of absolute unprovability.
+
+\tableofcontents
+
+\clearpage
 
 \subsection*{Provenance}
 This formalisation is inspired by:
@@ -25,7 +46,7 @@ and comments, and helping diagnose or structure Isabelle/HOL proof scripts.
 \subsection*{Main goal}
 The goal of this theory is to formalise an \emph{information--theoretic barrier}
 for a broad and natural class of trace-based proof strategies for the Collatz
-$3n+1$ conjecture.  Concretely, we prove a conditional statement: in any proof
+$3n+1$ conjecture. Concretely, we prove a conditional statement: in any proof
 system satisfying the explicit assumptions stated in the locale below about
 how computational trace information is represented and preserved, there can be
 no \emph{finite proof certificate} establishing the required unbounded
@@ -82,17 +103,21 @@ no finite proof exists \emph{within this class of proof systems}.
 \end{description}
 \<close>
 
-section \<open>1. Collatz map and parity vectors\<close>
+theory Collatz_Information_Barriers
+  imports Main
+begin
+
+section \<open>Collatz map and parity vectors\<close>
 
 text \<open>
 \subsection*{The Collatz function}
 We define $T$ as the simplified Collatz map that divides by $2$ in both branches:
 \[
 T(n) =
-\begin{cases}
-n/2 & \text{if $n$ is even},\\
-(3n+1)/2 & \text{if $n$ is odd}.
-\end{cases}
+\begin{array}{ll}
+n/2 & \mbox{if } n \mbox{ is even},\\
+(3n+1)/2 & \mbox{if } n \mbox{ is odd}.
+\end{array}
 \]
 \<close>
 
@@ -171,7 +196,7 @@ definition parity_vec :: "nat \<Rightarrow> nat \<Rightarrow> bool list"
 lemma length_parity_vec[simp]: "length (parity_vec n k) = k"
   by (simp add: parity_vec_def)
 
-section \<open>2. Affine formula characterisation\<close>
+section \<open>Affine formula characterisation\<close>
 
 text \<open>
 After $k$ iterations of the Collatz map $T$, the result admits an affine
@@ -357,7 +382,7 @@ proof -
     by (simp add: params0_def)
 qed
 
-section \<open>3. Two-adic invariance\<close>
+section \<open>Two-adic invariance\<close>
 
 text \<open>
 \subsection*{Key lemma}
@@ -469,7 +494,7 @@ next
   finally show ?case .
 qed
 
-section \<open>4. Every parity vector is realisable\<close>
+section \<open>Every parity vector is realisable\<close>
 
 text \<open>
 \subsection*{Realisability}
@@ -671,7 +696,7 @@ next
   qed
 qed
 
-section \<open>5. Proof system setup\<close>
+section \<open>Proof system setup\<close>
 
 type_synonym bit = bool
 type_synonym bitstring = "bit list"
@@ -702,10 +727,10 @@ encodings) are intentionally left outside the scope of this development.
 definition contains :: "bitstring \<Rightarrow> bitstring \<Rightarrow> bool"
   where "contains p s \<longleftrightarrow> (\<exists>u v. p = u @ s @ v)"
 
-lemma contains_len_bound: "contains p s ⟹ length s \<le> length p"
+lemma contains_len_bound: "contains p s ==> length s <= length p"
   by (auto simp: contains_def)
 
-section \<open>6. The unprovability theorem\<close>
+section \<open>The unprovability theorem\<close>
 
 (* Finiteness lemmas for counting *)
 
@@ -713,10 +738,10 @@ lemma finite_bitstrings_of_len:
   "finite {s::bitstring. length s = m}"
 proof -
   have fin_aux:
-    "finite {s::bool list. set s ⊆ (UNIV::bool set) \<and> length s = m}"
+    "finite {s::bool list. set s <= (UNIV::bool set) \<and> length s = m}"
     by (rule finite_lists_length_eq) simp
   have "{s::bitstring. length s = m}
-        = {s. set s ⊆ (UNIV::bool set) \<and> length s = m}"
+        = {s. set s <= (UNIV::bool set) \<and> length s = m}"
     by auto
   then show ?thesis using fin_aux by (simp only:)
 qed
@@ -729,9 +754,9 @@ proof (induction m)
   thus ?case by simp
 next
   case (Suc m)
-  have "{s. length s = Suc m} = (\<lambda>b. True # b) ` {s. length s = m} ∪ (\<lambda>b. False # b) ` {s. length s = m}"
+  have "{s. length s = Suc m} = (%b. True # b) ` {s. length s = m} Un (%b. False # b) ` {s. length s = m}"
     by (auto simp: length_Suc_conv)
-  moreover have "(\<lambda>b. True # b) ` {s. length s = m} ∩ (\<lambda>b. False # b) ` {s. length s = m} = {}"
+  moreover have "(\<lambda>b. True # b) ` {s. length s = m} Int (\<lambda>b. False # b) ` {s. length s = m} = {}"
     by auto
   moreover have "inj_on (\<lambda>b. True # b) {s. length s = m}"
     by (auto simp: inj_on_def)
@@ -752,7 +777,7 @@ definition incompressible_by :: "bitstring \<Rightarrow> (bitstring \<Rightarrow
   "incompressible_by s enc \<equiv> \<not>compressible s enc"
 
 (* Sum of geometric series: 2^0 + 2^1 + ... + 2^(m-1) = 2^m - 1 *)
-lemma sum_pow2_lt: "(∑i<m. (2::nat) ^ i) = 2 ^ m - 1"
+lemma sum_pow2_lt: "sum (%i. (2::nat) ^ i) {..<m} = 2 ^ m - 1"
   by (induction m) simp_all
 
 lemma finite_bitstrings_le_len:
@@ -761,24 +786,25 @@ proof (induction m)
   case 0 show ?case by (simp add: finite_bitstrings_of_len)
 next
   case (Suc m)
-  have "{s::bitstring. length s \<le> Suc m}
-      = {s. length s \<le> m} ∪ {s. length s = Suc m}" by auto
+  have "{s::bitstring. length s <= Suc m}
+      = {s. length s <= m} Un {s. length s = Suc m}" by auto
   thus ?case using Suc.IH finite_bitstrings_of_len by (simp add: finite_UnI)
 qed
 
 lemma card_bitstrings_le_len:
-  "card {s::bitstring. length s \<le> m} = (∑i\<le>m. 2 ^ i)"
+  "card {s::bitstring. length s <= m} = sum (%i. 2 ^ i) {..m}"
 proof -
   let ?S = "\<lambda>i. {s::bitstring. length s = i}"
-  have union_eq: "{s::bitstring. length s \<le> m} = (⋃i∈{..m}. ?S i)" by auto
-  have fin_index: "finite ({..m}::nat set)" by simp
-  have fin_each: "⋀i. i \<le> m ⟹ finite (?S i)"
-    by (simp add: finite_bitstrings_of_len)
-  have disj: "⋀i j. i \<le> m ⟹ j \<le> m ⟹ i \<noteq> j ⟹ ?S i ∩ ?S j = {}"
+  have union_eq: "{s::bitstring. length s <= m} = Union ((%i. ?S i) ` {..m})"
     by auto
-  have "card (⋃i∈{..m}. ?S i) = (∑i∈{..m}. card (?S i))"
+  have fin_index: "finite ({..m}::nat set)" by simp
+  have fin_each: "!!i. i <= m ==> finite (?S i)"
+    by (simp add: finite_bitstrings_of_len)
+  have disj: "!!i j. i <= m ==> j <= m ==> i ~= j ==> ?S i Int ?S j = {}"
+    by auto
+  have "card (Union ((%i. ?S i) ` {..m})) = sum (%i. card (?S i)) {..m}"
     by (rule card_UN_disjoint) (use fin_index fin_each disj in auto)
-  also have "... = (∑i∈{..m}. 2 ^ i)"
+  also have "... = sum (%i. 2 ^ i) {..m}"
     by (simp add: many_strings_of_length)
   finally show ?thesis
     by (simp add: union_eq)
@@ -808,27 +834,28 @@ next
   have finT: "finite ?T" by (simp add: finite_bitstrings_le_len)
   have Sm: "card ?S = 2 ^ Suc r"
     by (simp add: many_strings_of_length)
-  have Tm: "card ?T = (∑i\<le>r. 2 ^ i)"
+  have Tm: "card ?T = sum (%i. (2::nat) ^ i) {..r}"
     by (simp add: card_bitstrings_le_len)
-  also have "... = (∑i < Suc r. 2 ^ i)"
+  also have "... = sum (%i. (2::nat) ^ i) {..<Suc r}"
     by (simp add: lessThan_Suc_atMost)
-  finally have Tm': "card ?T = (∑i < Suc r. 2 ^ i)" .
+  finally have Tm': "card ?T = sum (%i. (2::nat) ^ i) {..<Suc r}" .
   from Tm' have lt: "card ?T = 2 ^ Suc r - 1"
     by (simp add: sum_pow2_lt)
-  from Sm lt have "card ?T < card ?S" by simp
-  
-  have not_all_shrink: "\<not>(\<forall>t∈?S. length (enc t) \<le> r)"
+  from Sm lt have card_less: "card ?T < card ?S" by simp
+
+  have not_all_shrink: "~(ALL t:?S. length (enc t) <= r)"
   proof
-    assume H: "\<forall>t∈?S. length (enc t) \<le> r"
-    have "enc ` ?S ⊆ ?T" using H by auto
-    hence "card (enc ` ?S) \<le> card ?T"
+    assume H: "ALL t:?S. length (enc t) <= r"
+    have "enc ` ?S <= ?T" using H by auto
+    hence "card (enc ` ?S) <= card ?T"
       using finT card_mono by blast
     moreover from assms finS have "card (enc ` ?S) = card ?S"
       using card_image by (metis subset_UNIV subset_inj_on)
-    ultimately show False using ‹card ?T < card ?S› by linarith
+    ultimately show False using card_less by linarith
   qed
+
+  then obtain t where tS: "t : ?S" and len: "~ length (enc t) <= r" by blast
   
-  then obtain t where tS: "t ∈ ?S" and len: "\<not>length (enc t) \<le> r" by blast
   hence "length (enc t) \<ge> Suc r" by simp
   moreover from tS have "length t = Suc r" by auto
   ultimately show ?thesis using Suc incompressible_by_def compressible_def by auto
@@ -943,23 +970,23 @@ containment assumption is not arbitrary; it reflects a genuine structural
 feature of the actual Collatz dynamics.
 \<close>
 
-locale Collatz_Unprovability =
+locale Collatz_Trace_Barrier =
   fixes enc_parity :: "bool list \<Rightarrow> bitstring"
     and is_proof_of_convergence :: "bitstring \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool"
     and is_collatz_proof :: "bitstring \<Rightarrow> bool"
   
   (* ASSUMPTION 1: Proofs must contain encoded parity information *)
   assumes proof_contains_parity:
-    "is_proof_of_convergence p k n ⟹ contains p (enc_parity (parity_vec n k))"
+    "is_proof_of_convergence p k n ==> contains p (enc_parity (parity_vec n k))"
 
   (* ASSUMPTION 2: Encoding preserves incompressibility *)
   assumes encoding_preserves_incompressibility:
-    "⟦incompressible_by s enc_parity; length s = m; take m t = s⟧ 
-     ⟹ length (enc_parity t) \<ge> m"
+    "[| incompressible_by s enc_parity; length s = m; take m t = s |]
+     ==> length (enc_parity t) >= m"
   
   (* ASSUMPTION 3: Collatz proofs work for unbounded iterations *)
   assumes collatz_proof_unbounded:
-    "is_collatz_proof p ⟹ \<forall>n L. \<exists>k\<ge>L. is_proof_of_convergence p k n"
+    "is_collatz_proof p ==> ALL n L. EX k>=L. is_proof_of_convergence p k n"
 begin
 
 lemma incompressible_parity_encodings_exist:
@@ -1015,10 +1042,6 @@ proof -
     k_proof: "is_proof_of_convergence p k n" 
     by blast
   
-  (* By assumption 1, the proof must contain the encoded parity vector *)
-  have "contains p (enc_parity (parity_vec n k))"
-    using proof_contains_parity[OF k_proof] .
-  
   (* The parity vector has s as its prefix *)
   have "take (Suc L) (parity_vec n k) = parity_vec n (Suc L)"
     using k_ge parity_vec_prefix by auto
@@ -1030,10 +1053,13 @@ proof -
     using encoding_preserves_incompressibility[OF s_incomp s_len prefix] by blast
   
   (* But the proof contains this encoding, so must be at least Suc L long *)
-  have len_le: "length (enc_parity (parity_vec n k)) \<le> length p"
-    using contains_len_bound[OF ‹contains p (enc_parity (parity_vec n k))›] .
+  have contains_fact: "contains p (enc_parity (parity_vec n k))"
+    using proof_contains_parity[OF k_proof] .
 
-  have "Suc L \<le> length p"
+  have len_le: "length (enc_parity (parity_vec n k)) <= length p"
+    using contains_len_bound[OF contains_fact] .
+
+  have "Suc L <= length p"
     using enc_large len_le by linarith
 
   thus False
