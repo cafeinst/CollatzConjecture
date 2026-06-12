@@ -12,12 +12,12 @@ Machine-Checked Formalization in Isabelle/HOL
 \subsection*{Abstract}
 
 In an earlier paper, \emph{The Collatz 3n+1 Conjecture is Unprovable}
-(2012), the author argued that any proof of the Collatz conjecture must encode
-arbitrarily large amounts of parity information and therefore cannot be finite.
-The present work formalises the mathematical framework underlying that argument.
-Under explicit assumptions concerning the representation and preservation of
-computational trace information, we prove that no finite proof certificate can
-establish the required convergence property. The result provides a
+(2012), the author argued that any proof of the Collatz conjecture must encode 
+arbitrarily large amounts of parity information, leading to the conclusion that 
+no finite proof can exist. The present work formalises the mathematical framework 
+underlying that argument. Under explicit assumptions concerning the representation 
+and preservation of computational trace information, we prove that no finite proof 
+certificate can establish the required convergence property. The result provides a
 machine-checked information-theoretic barrier theorem inspired by the earlier
 argument.
 
@@ -33,22 +33,17 @@ arXiv:math/0312309; \emph{Global Journal of Science Frontier Research},
 Mathematics and Decision Sciences, Volume 12, Issue 8 (2012), 13--15.
 \end{quote}
 
-\noindent The present development is a formalisation of the information--theoretic ideas
+\noindent The present development formalises the information--theoretic ideas
 underlying the author's earlier paper \emph{The Collatz $3n+1$ Conjecture is
-Unprovable}. The earlier work argued that any proof of the Collatz
-conjecture must encode arbitrarily long parity information and therefore cannot
-be finite. In the present formalisation, the assumptions required for that argument are
-made explicit and are formalised within Isabelle/HOL. Under these assumptions,
-a machine-checked theorem is obtained showing that no finite proof certificate
-can exist within the corresponding class of proof systems.
+Unprovable}. The assumptions required for that argument are made explicit and
+formalised within Isabelle/HOL, yielding a machine-checked theorem showing that
+no finite proof certificate can exist within the corresponding class of proof
+systems.
 
-The author regards these assumptions as natural consequences of structural properties 
-of the Collatz map, including the realisability of arbitrary parity
-vectors, the injective dependence of affine parameters on parity traces, and the
-essential role of parity information in determining the dynamics. Consequently,
-the formal barrier theorem may be viewed as supporting and clarifying the
-intuition behind the earlier argument, while making its logical dependencies
-completely explicit.
+These assumptions are motivated by structural properties of the Collatz map, 
+including the realisability of arbitrary parity vectors, the injective dependence 
+of affine parameters on parity traces, and the essential role of parity information 
+in determining the dynamics.
 
 The author of this formalisation received assistance from two AI systems ---
 ChatGPT (OpenAI) and Claude (Anthropic). Their assistance consisted of drafting
@@ -57,20 +52,10 @@ and comments, and helping diagnose or structure Isabelle/HOL proof scripts.
 
 \subsection*{Main goal}
 
-The goal of this theory is to formalise an \emph{information--theoretic barrier}
-for a broad and natural class of trace-based proof strategies for the Collatz
-$3n+1$ conjecture.
-The motivating idea is the same as in the earlier paper: parity vectors encode
-the computational history of a Collatz trajectory, and arbitrarily long parity
-vectors occur in the dynamics. The present development asks what follows if a
-proof system is required to represent such trace information explicitly.
-
-Concretely, we prove a conditional statement: in any proof system satisfying the
-explicit assumptions stated in the locale below about how computational trace
-information is represented and preserved, there can be no finite proof
-certificate establishing the required unbounded convergence property.
-The result is therefore a barrier theorem for a class of proof methods. It does
-not prove that the Collatz conjecture is unprovable in an absolute sense.
+The present development investigates the consequences of requiring a proof system 
+to represent Collatz trace information explicitly. The resulting theorem
+establishes an information-theoretic barrier for a broad class of trace-based
+proof methods based on explicit representations of parity information.
 
 \subsection*{High-level strategy}
 
@@ -86,10 +71,7 @@ finite proof certificates cannot accommodate arbitrarily long
 incompressible traces.
 \end{enumerate}
 
-\noindent This is the same general intuition underlying the author's earlier paper, but
-the present development formulates the assumptions explicitly and proves only
-the conditional conclusion that follows from them.
-The structure of the argument is inspired by Chaitin--style incompressibility
+\noindent The structure of the argument is inspired by Chaitin--style incompressibility
 methods, but is applied to the representation of computational traces within
 proof certificates rather than to the computation of specific strings.
 
@@ -323,12 +305,16 @@ next
       then show False
       proof cases
         case TF
-        from pow2_dvd_fst_params_Suc[of i xs] Pxs have div_c:  "2 ^ Suc i dvd c"  by simp
-        from pow2_dvd_fst_params_Suc[of i ys'] Pys have div_c': "2 ^ Suc i dvd c'" by simp
+        from pow2_dvd_fst_params_Suc[of i xs] Pxs 
+        have div_c:  "2 ^ Suc i dvd c"  by simp
+        from pow2_dvd_fst_params_Suc[of i ys'] Pys 
+        have div_c': "2 ^ Suc i dvd c'" by simp
         let ?M = "2 ^ Suc i"
 
-        obtain t  where c_rep:  "c  = ?M * t"  using div_c  by (auto simp: dvd_def)
-        obtain t' where c'rep: "c' = ?M * t'" using div_c' by (auto simp: dvd_def)
+        obtain t  where c_rep:  "c  = ?M * t"  
+          using div_c  by (auto simp: dvd_def)
+        obtain t' where c'rep: "c' = ?M * t'" 
+          using div_c' by (auto simp: dvd_def)
 
         have Lmod: "(3 * c + 2 ^ i) mod ?M = 2 ^ i"
         proof -
@@ -349,12 +335,16 @@ next
         thus False using power_eq_0_iff by fastforce
       next
         case FT
-        from pow2_dvd_fst_params_Suc[of i ys'] Pys have div_c': "2 ^ Suc i dvd c'" by simp
-        from pow2_dvd_fst_params_Suc[of i xs]  Pxs have div_c:  "2 ^ Suc i dvd c"  by simp
+        from pow2_dvd_fst_params_Suc[of i ys'] Pys 
+        have div_c': "2 ^ Suc i dvd c'" by simp
+        from pow2_dvd_fst_params_Suc[of i xs]  Pxs 
+        have div_c:  "2 ^ Suc i dvd c"  by simp
         let ?M = "2 ^ Suc i"
 
-        obtain t' where c'rep: "c' = ?M * t'" using div_c' by (auto simp: dvd_def)
-        obtain t  where c_rep:  "c  = ?M * t"  using div_c  by (auto simp: dvd_def)
+        obtain t' where c'rep: "c' = ?M * t'" 
+          using div_c' by (auto simp: dvd_def)
+        obtain t  where c_rep:  "c  = ?M * t"  
+          using div_c  by (auto simp: dvd_def)
 
         have Rmod: "(3 * c' + 2 ^ i) mod ?M = 2 ^ i"
         proof -
@@ -389,9 +379,11 @@ lemma formula_determines_parity_on_len:
   assumes "length x = k" "length y = k" "formula_of x = formula_of y"
   shows   "x = y"
 proof -
-  from assms(3) have "snd (params0 x) = snd (params0 y)" "fst (params0 x) = fst (params0 y)"
+  from assms(3) 
+  have "snd (params0 x) = snd (params0 y)" "fst (params0 x) = fst (params0 y)"
     by (auto simp: formula_of_def)
-  hence "params0 x = params0 y" by (cases "params0 x"; cases "params0 y"; simp)
+  hence "params0 x = params0 y" 
+    by (cases "params0 x"; cases "params0 y"; simp)
   thus ?thesis
     using assms(1,2) params_injective_len[of x y 0]
     by (simp add: params0_def)
@@ -630,7 +622,6 @@ lemma choose_t_odd_mod3:
 proof -
   define t where "t = (2 * (2 - (m0 mod 3))) mod 3"
   have t_le2: "t \<le> 2" by (simp add: t_def)
-
   have "(m0 + t * 2 ^ l) mod 3
           = (m0 mod 3 + t * (2 ^ l mod 3)) mod 3"
     by (metis mod_add_cong mod_mod_trivial mod_mult_right_eq)
@@ -639,7 +630,8 @@ proof -
   also have "... = (m0 mod 3 + (4 * (2 - (m0 mod 3))) mod 3) mod 3"
     using mod_mult_right_eq by (metis (no_types, lifting)
      distrib_right mod_add_eq mod_add_left_eq mult_2_right numeral_Bit0_eq_double)
-  also have "... = (m0 mod 3 + ((4 mod 3) * ((2 - (m0 mod 3)) mod 3)) mod 3) mod 3"
+  also have "... = (m0 mod 3 + ((4 mod 3) * 
+    ((2 - (m0 mod 3)) mod 3)) mod 3) mod 3"
     using mod_mult_left_eq by (metis mod_mult_right_eq)
   also have "... = (m0 mod 3 + ((2 - (m0 mod 3)) mod 3)) mod 3" by simp
   also have "... = 2" by (cases "m0 mod 3") simp_all
@@ -755,9 +747,11 @@ proof (induction m)
   thus ?case by simp
 next
   case (Suc m)
-  have "{s. length s = Suc m} = (%b. True # b) ` {s. length s = m} Un (%b. False # b) ` {s. length s = m}"
+  have "{s. length s = Suc m} = 
+    (%b. True # b) ` {s. length s = m} Un (%b. False # b) ` {s. length s = m}"
     by (auto simp: length_Suc_conv)
-  moreover have "(\<lambda>b. True # b) ` {s. length s = m} Int (\<lambda>b. False # b) ` {s. length s = m} = {}"
+  moreover have "(\<lambda>b. True # b) ` {s. length s = m} 
+    Int (\<lambda>b. False # b) ` {s. length s = m} = {}"
     by auto
   moreover have "inj_on (\<lambda>b. True # b) {s. length s = m}"
     by (auto simp: inj_on_def)
@@ -856,7 +850,8 @@ next
   
   hence "length (enc t) \<ge> Suc r" by simp
   moreover from tS have "length t = Suc r" by auto
-  ultimately show ?thesis using Suc incompressible_by_def compressible_def by auto
+  ultimately show ?thesis 
+    using Suc incompressible_by_def compressible_def by auto
 qed
 
 text \<open>
@@ -953,13 +948,13 @@ The Collatz function simultaneously satisfies the following three properties:
 \item The affine parameters encode the parity vector injectively.
 \end{enumerate}
 
-\noindent Because realisability forces a proof to consider all parity patterns, opposite
-monotonicity prevents the parity information from being bypassed, and injectivity
-shows that affine data and parity data are equivalent, any proof of universal
-convergence for the Collatz map must effectively encode the relevant parity
-vector. Since these properties fail for many superficially similar functions, the
-containment assumption is not arbitrary; it reflects a genuine structural
-feature of the actual Collatz dynamics.\<close>
+\noindent Because realisability forces a proof to account for all parity patterns, 
+opposite monotonicity prevents parity information from being bypassed, and 
+injectivity shows that affine data and parity data are equivalent, these properties 
+provide strong motivation for the containment assumption that proofs effectively 
+encode the relevant parity vector. Since these properties fail for many superficially 
+similar functions, the containment assumption is not arbitrary; it reflects a genuine 
+structural feature of the actual Collatz dynamics.\<close>
 
 locale Collatz_Trace_Barrier =
   fixes enc_parity :: "bool list \<Rightarrow> bitstring"
@@ -967,7 +962,8 @@ locale Collatz_Trace_Barrier =
     and is_collatz_proof :: "bitstring \<Rightarrow> bool"
   (* ASSUMPTION 1: Proofs must contain encoded parity information *)
   assumes proof_contains_parity:
-    "is_proof_of_convergence p k n ==> contains p (enc_parity (parity_vec n k))"
+    "is_proof_of_convergence p k n
+     ==> contains p (enc_parity (parity_vec n k))"
   (* ASSUMPTION 2: Encoding preserves incompressibility *)
   assumes encoding_preserves_incompressibility:
     "[| incompressible_by s enc_parity; length s = m; take m t = s |]
@@ -990,12 +986,9 @@ lemma parity_vec_prefix:
 text \<open>
 \subsection*{Interpretation of the main theorem}
 
-Under Assumptions (1) through (3), no finite proof of the Collatz conjecture can
-exist. This theorem is conditional. We do not claim that every proof system must
-satisfy the containment assumption. Rather, the structural features of the
-actual Collatz map, namely realisability of all parity vectors, opposite
-monotonicity, and injectivity of the affine parameters, provide strong
-justification for requiring it.
+Under Assumptions (1)–(3), no finite proof exists within this class of proof 
+systems. The theorem is conditional on these assumptions, which are motivated 
+by structural properties of the Collatz map.
 \<close>
 
 theorem no_finite_collatz_proof:
