@@ -197,7 +197,7 @@ text \<open>
 After $k$ iterations of the Collatz map $T$, the result admits an affine
 representation:
 \[
-T^k(n) = \frac{3^s \cdot n + c}{2^k}.
+T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k}.
 \]
 
 \noindent Here:
@@ -238,7 +238,7 @@ Different parity vectors produce different affine formula parameters. In
 particular, distinct parity sequences yield distinct triples $(k,s,c)$ in the
 representation
 \[
-T^k(n) = \frac{3^s \cdot n + c}{2^k}.
+T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k}.
 \]
 \<close>
 
@@ -930,7 +930,7 @@ monotone invariant, without referring to individual parity choices.
 \paragraph{3. Injectivity of the affine formula}
 For the Collatz map, we have the identity
 \[
-T^k(n) = \frac{3^s \cdot n + c}{2^k},
+T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k},
 \]
 where the parameters $(k,s,c)$ depend on the parity vector. As shown earlier,
 these parameters uniquely determine the parity vector. Consequently, any argument
@@ -948,9 +948,9 @@ The Collatz function simultaneously satisfies the following three properties:
 \end{enumerate}
 
 \noindent Because realisability forces a proof to account for all parity patterns, 
-opposite monotonicity prevents parity information from being bypassed, and 
+opposite monotonicity makes parity information indispensable, and 
 injectivity shows that affine data and parity data are equivalent, these properties 
-provide strong motivation for the containment assumption that proofs effectively 
+provide strong justification for the containment assumption that proofs effectively 
 encode the relevant parity vector. Since these properties fail for many superficially 
 similar functions, the containment assumption is not arbitrary; it reflects a genuine 
 structural feature of the actual Collatz dynamics.\<close>
