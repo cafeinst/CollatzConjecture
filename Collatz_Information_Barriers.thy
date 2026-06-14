@@ -56,7 +56,7 @@ proof methods based on explicit representations of parity information.
 
 \subsection*{High-level strategy}
 
-The argument formalised here isolates the following phenomenon:
+The argument formalised here isolates the following phenomena:
 
 \begin{enumerate}
 \item Certain proof strategies must expose or encode complete computational
