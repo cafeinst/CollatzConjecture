@@ -11,13 +11,13 @@ Machine-Checked Formalization in Isabelle/HOL
 
 \subsection*{Abstract}
 
-In an earlier paper, \emph{The Collatz 3n+1 Conjecture is Unprovable}
-(2012), the author argued that any proof of the Collatz conjecture must encode 
-arbitrarily large amounts of parity information, leading to the conclusion that 
-no finite proof can exist. The present work formalises the mathematical framework 
-underlying that argument. Under explicit assumptions concerning the representation 
-and preservation of computational trace information, we prove that no finite proof 
-certificate can establish the required convergence property. The result provides a
+In an earlier paper, \emph{The Collatz $3n+1$ Conjecture is Unprovable}
+(2012), the author argued that any proof of the Collatz conjecture would need
+to contain arbitrarily large amounts of information about the parity pattern of
+Collatz trajectories, making a finite proof impossible. The present work
+formalises that idea in Isabelle/HOL. Under explicit assumptions about how
+proofs store and preserve information, we prove that no finite proof
+can establish the required convergence property. This yields a
 machine-checked information-theoretic barrier theorem inspired by the earlier
 argument.
 
@@ -26,21 +26,18 @@ argument.
 \clearpage
 
 \subsection*{Provenance}
-This formalisation is inspired by:
+The present development formalises the information--theoretic ideas
+underlying the author's earlier paper:
 \begin{quote}
 C.\ A.\ Feinstein, \emph{``The Collatz $3n+1$ Conjecture is Unprovable''},
 arXiv:math/0312309; \emph{Global Journal of Science Frontier Research},
 Mathematics and Decision Sciences, Volume 12, Issue 8 (2012), 13--15.
 \end{quote}
 
-\noindent The present development formalises the information--theoretic ideas
-underlying the author's earlier paper \emph{The Collatz $3n+1$ Conjecture is
-Unprovable}. The assumptions required for that argument are made explicit and
+\noindent The assumptions required for that argument are made explicit and
 formalised within Isabelle/HOL, yielding a machine-checked theorem showing that
-no finite proof certificate can exist within the corresponding class of proof
-systems.
-
-These assumptions are motivated by structural properties of the Collatz map, 
+no finite proof can exist within the corresponding class of proof
+systems. These assumptions are motivated by structural properties of the Collatz map, 
 including the realisability of arbitrary parity vectors, the injective dependence 
 of affine parameters on parity traces, and the essential role of parity information 
 in determining the dynamics.
@@ -142,12 +139,12 @@ The standard formulation of the Collatz conjecture is:
 \forall n.\ \exists k.\ T^{(k)}(n) = 1.
 \]
 
-\noindent An equivalent unbounded formulation is:
+\noindent An unbounded formulation is:
 \[
 \forall n\ \forall L.\ \exists k \ge L.\ T^{(k)}(n) = 1.
 \]
 
-\noindent These formulations are equivalent. Once a number reaches $1$, the Collatz
+\noindent These formulations are equivalent: Once a number reaches $1$, the Collatz
 iteration enters the cycle
 \[
 1 \to 2 \to 1 \to 2 \to \cdots
@@ -380,7 +377,8 @@ lemma formula_determines_parity_on_len:
   shows   "x = y"
 proof -
   from assms(3) 
-  have "snd (params0 x) = snd (params0 y)" "fst (params0 x) = fst (params0 y)"
+  have "snd (params0 x) = snd (params0 y)" 
+       "fst (params0 x) = fst (params0 y)"
     by (auto simp: formula_of_def)
   hence "params0 x = params0 y" 
     by (cases "params0 x"; cases "params0 y"; simp)
@@ -490,8 +488,8 @@ next
       using Suc.IH[of "T m" "3*q"] by simp
   qed
   
-  have step1: "parity_vec (m + ?\<Delta>) (Suc k)
-             = odd (m + ?\<Delta>) # parity_vec (T (m + ?\<Delta>)) k"
+  have step1: "parity_vec (m + ?\<Delta>) (Suc k) =
+               odd (m + ?\<Delta>) # parity_vec (T (m + ?\<Delta>)) k"
     by (simp add: parity_vec_Suc)
   also have step2: "... = odd m # parity_vec (T m) k"
     using head tail by blast
@@ -748,7 +746,8 @@ proof (induction m)
 next
   case (Suc m)
   have "{s. length s = Suc m} = 
-    (%b. True # b) ` {s. length s = m} Un (%b. False # b) ` {s. length s = m}"
+    (%b. True # b) ` {s. length s = m} 
+    Un (%b. False # b) ` {s. length s = m}"
     by (auto simp: length_Suc_conv)
   moreover have "(\<lambda>b. True # b) ` {s. length s = m} 
     Int (\<lambda>b. False # b) ` {s. length s = m} = {}"
@@ -760,7 +759,7 @@ next
   ultimately show ?case
     using Suc.IH card_Un_disjoint card_image
     by (smt (verit) Suc_1 Suc_pred card.infinite diff_add_zero mult_2 nat.discI 
-        plus_1_eq_Suc power_Suc0_right power_add power_eq_0_iff zero_less_one)
+       plus_1_eq_Suc power_Suc0_right power_add power_eq_0_iff zero_less_one)
 qed
 (* Incompressibility definitions *)
 definition compressible :: "bitstring \<Rightarrow> (bitstring \<Rightarrow> bitstring) \<Rightarrow> bool" where
@@ -1001,13 +1000,15 @@ proof -
   obtain s where 
     s_len: "length s = Suc L" and 
     s_incomp: "incompressible_by s enc_parity"
-    using incompressible_parity_encodings_exist[OF assms(1), of "Suc L"] by blast
+    using incompressible_parity_encodings_exist[OF assms(1), of "Suc L"] 
+    by blast
   (* By realizability, this parity vector is realized by some number *)
   obtain n where pv_eq: "parity_vec n (Suc L) = s"
     using parity_vector_realizable[of s] s_len by auto
   (* By unbounded form, the proof must handle this number at large iterations *)
   have "\<exists>k\<ge>Suc L. is_proof_of_convergence p k n"
-    using assms(2) collatz_proof_unbounded by blast
+    using assms(2) collatz_proof_unbounded 
+    by blast
 
   then obtain k where 
     k_ge: "k \<ge> Suc L" and 
@@ -1020,7 +1021,8 @@ proof -
   finally have prefix: "take (Suc L) (parity_vec n k) = s" .
   (* By assumption 2, encoding s preserves its length *)
   have enc_large: "length (enc_parity (parity_vec n k)) \<ge> Suc L"
-    using encoding_preserves_incompressibility[OF s_incomp s_len prefix] by blast
+    using encoding_preserves_incompressibility[OF s_incomp s_len prefix] 
+    by blast
   (* But the proof contains this encoding, so must be at least Suc L long *)
   have contains_fact: "contains p (enc_parity (parity_vec n k))"
     using proof_contains_parity[OF k_proof] .
@@ -1038,7 +1040,8 @@ qed
 corollary no_collatz_proof_in_this_system:
   assumes "inj enc_parity"
   shows "\<not> (\<exists>p. is_collatz_proof p)"
-  using no_finite_collatz_proof[OF assms] by blast
+  using no_finite_collatz_proof[OF assms] 
+  by blast
 
 end (* End of locale *)
 end (* End of theory *)
