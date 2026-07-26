@@ -12,19 +12,14 @@ Machine-Checked Formalization in Isabelle/HOL
 \subsection*{Abstract}
 
 In an earlier paper, \emph{The Collatz $3n+1$ Conjecture is Unprovable}
-(2012), the author gave an information--theoretic argument against the
-existence of a formal proof of the Collatz conjecture. The present work
-formalises that argument in Isabelle/HOL using the original formulation
-\[
-\forall n>0.\ \exists k.\ T^{(k)}(n)=1.
-\]
-Given a proposed proof of length $L$, the formal argument chooses an
-incompressible parity vector of length $L+1$, realises it as the beginning of a
-Collatz trajectory, and arranges that the next parity agrees with the final
-parity in the vector. This forces any occurrence of $1$ to come after step
-$L$. Under an explicit formal version of Theorem 2 of the earlier paper,
-requiring the proof to specify this parity information, a contradiction
-follows.
+(2012), the author argued that any proof of the Collatz conjecture would need
+to contain arbitrarily large amounts of information about the parity pattern of
+Collatz trajectories, making a finite proof impossible. The present work
+formalises that idea in Isabelle/HOL. Under explicit assumptions about how
+proofs store and preserve information, we prove that no finite proof
+can establish the required convergence property. This yields a
+machine-checked information-theoretic barrier theorem inspired by the earlier
+argument.
 
 \tableofcontents
 
@@ -72,9 +67,8 @@ equal.
 \item The equality of these two parities implies that the value at step $L$ is
 greater than $2$, and therefore any step at which the trajectory equals $1$
 must occur after step $L$.
-\item Under the trace--specification principle corresponding to Theorem 2 of
-the earlier paper, the proposed proof must contain an encoding of the chosen
-$L+1$ bits, contradicting its length $L$.
+\item Under the trace--specification assumption, the proposed proof must
+contain an encoding of the chosen $L+1$ bits, contradicting its length $L$.
 \end{enumerate}
 
 \noindent The structure of the argument is inspired by Chaitin--style incompressibility
@@ -87,7 +81,7 @@ proof certificates rather than to the computation of specific strings.
 
 \item[1. Collatz map and parity vectors]
 We define the simplified Collatz function $T$ and formalise parity vectors as
-computational traces of the iteration.
+computational traces of the iterative process.
 
 \item[2. Affine formula characterisation]
 We show that $T^{(k)}(n)$ admits an affine representation
@@ -109,9 +103,8 @@ We introduce an abstract model of proof certificates based on bitstrings,
 substring containment, and information--theoretic compressibility.
 
 \item[6. The original information--barrier argument]
-We formalise the proof from the earlier paper for the ordinary Collatz
-conjecture. The formal theorem is conditional on the trace--specification
-principle corresponding to Theorem 2 of that paper.
+We formalise the original information--theoretic argument for the
+Collatz conjecture, with its proof--system requirements stated explicitly.
 
 \end{description}
 \<close>
@@ -124,7 +117,7 @@ section \<open>Collatz map and parity vectors\<close>
 
 text \<open>
 \subsection*{The Collatz function}
-We define the simplified Collatz function $T$ by
+We define the Collatz function $T$ by
 \[
 T(n) =
 \begin{cases}
@@ -143,7 +136,8 @@ abbreviation Tpow :: "nat \<Rightarrow> nat \<Rightarrow> nat"
 text \<open>
 \subsection*{The Collatz conjecture}
 
-The formulation used in the earlier paper, and throughout this development, is:
+The formulation of the conjecture used in the earlier paper, and throughout 
+this development, is:
 \[
 \forall n>0.\ \exists k.\ T^{(k)}(n) = 1.
 \]
@@ -158,8 +152,8 @@ odd values encountered during the first $k$ iterations starting from $n$:
    \textit{odd}(T^{(k-1)}(n))\ ].
 \]
 
-\noindent This parity vector represents the \emph{computational trace}: the sequence of
-branching decisions taken during the iteration of the Collatz map.
+\noindent This parity vector represents the \emph{computational trace}: 
+the sequence of branching decisions made while repeatedly applying the Collatz map.
 
 \subsection*{Example}
 
@@ -315,7 +309,8 @@ next
         have Lmod: "(3 * c + 2 ^ i) mod ?M = 2 ^ i"
         proof -
           have "(3 * c + 2 ^ i) mod ?M
-              = ((?M * (3 * t)) + 2 ^ i) mod ?M" by (simp add: c_rep algebra_simps)
+              = ((?M * (3 * t)) + 2 ^ i) mod ?M" 
+            by (simp add: c_rep algebra_simps)
           also have "... = (2 ^ i) mod ?M"
             by (meson mod_drop_left_multiple_nat)
           also have "... = 2 ^ i" by simp
@@ -345,7 +340,8 @@ next
         have Rmod: "(3 * c' + 2 ^ i) mod ?M = 2 ^ i"
         proof -
           have "(3 * c' + 2 ^ i) mod ?M
-              = ((?M * (3 * t')) + 2 ^ i) mod ?M" by (simp add: c'rep algebra_simps)
+              = ((?M * (3 * t')) + 2 ^ i) mod ?M" 
+            by (simp add: c'rep algebra_simps)
           also have "... = (2 ^ i) mod ?M"
             using mod_drop_left_multiple_nat by blast
           also have "... = 2 ^ i" by simp
@@ -431,7 +427,8 @@ next
   then have iSk: "i < Suc k" by (simp add: parity_vec_def)
   consider (Z) "i = 0" | (S) j where "i = Suc j" "j < k"
     using iSk by (cases i) auto
-  then show "parity_vec n (Suc k) ! i = (odd n # parity_vec (T n) k) ! i"
+  then show  "parity_vec n (Suc k) ! i = 
+             (odd n # parity_vec (T n) k) ! i"
   proof cases
     case Z
     show ?thesis
@@ -575,7 +572,8 @@ lemma pow2_mod3_odd:
   assumes "odd l"
   shows "(2 :: nat) ^ l mod 3 = 2"
 proof -
-  obtain m where L: "l = Suc (2*m)" using assms by (metis Suc_eq_plus1 oddE)
+  obtain m where L: "l = Suc (2*m)" using assms 
+    by (metis Suc_eq_plus1 oddE)
   have "2 ^ l mod 3 = (2 * 2 ^ (2*m)) mod 3" by (simp add: L)
   also have "... = (2 * (((2::nat) ^ 2) ^ m)) mod 3"
     by (simp add: power_mult_nat)
@@ -598,7 +596,6 @@ lemma choose_t_even_mod3:
 proof -
   define t where "t = (2 - (m0 mod 3)) mod 3"
   have t_le2: "t \<le> 2" by (simp add: t_def)
-  
   have "(m0 + t * 2 ^ l) mod 3
           = (m0 mod 3 + t * (2 ^ l mod 3)) mod 3"
     by (metis mod_add_cong mod_mod_trivial mod_mult_right_eq)
@@ -622,7 +619,8 @@ proof -
   have "(m0 + t * 2 ^ l) mod 3
           = (m0 mod 3 + t * (2 ^ l mod 3)) mod 3"
     by (metis mod_add_cong mod_mod_trivial mod_mult_right_eq)
-  also have "... = (m0 mod 3 + ((2 * (2 - (m0 mod 3))) mod 3) * 2) mod 3"
+  also have "... = (m0 mod 3 + ((2 * (2 - (m0 mod 3))) mod 3) * 2) 
+            mod 3"
     by (simp add: t_def pow2_mod3 assms)
   also have "... = (m0 mod 3 + (4 * (2 - (m0 mod 3))) mod 3) mod 3"
     using mod_mult_right_eq by (metis (no_types, lifting)
@@ -659,9 +657,11 @@ next
   next
     case True
     let ?l = "length bs"
-    obtain t where t_le2: "t \<le> 2" and targ: "(m0 + t * 2 ^ ?l) mod 3 = 2"
+    obtain t where t_le2: "t \<le> 2" and 
+                   targ: "(m0 + t * 2 ^ ?l) mod 3 = 2"
       by (cases "even ?l")
-         (use choose_t_even_mod3[of ?l m0] choose_t_odd_mod3[of ?l m0] in auto)
+         (use choose_t_even_mod3[of ?l m0] 
+          choose_t_odd_mod3[of ?l m0] in auto)
     let ?m = "m0 + t * 2 ^ ?l"
     have tail_preserved: "parity_vec ?m ?l = bs"
       using IH parity_vec_add_pow2_invariant[of m0 t ?l] by simp
@@ -682,7 +682,8 @@ next
     qed
     have tail_step: "parity_vec (T ?n) ?l = bs"
       using tail_preserved head by (simp add: m_eq T_def)
-    have "parity_vec ?n (length (b # bs)) = odd ?n # parity_vec (T ?n) ?l"
+    have "parity_vec ?n (length (b # bs)) = 
+          odd ?n # parity_vec (T ?n) ?l"
       by (simp add: parity_vec_Suc)
     also have "... = True # bs" using head tail_step by simp
     also have "... = b # bs" by (simp add: True)
@@ -691,7 +692,7 @@ next
 qed
 
 text \<open>
-\subsection*{Theorem 1 in the form used in the earlier paper}
+\subsection*{Realisability with matching successive parity}
 
 Let $x$ be a bit vector of length $L+1$. There is a positive natural number
 $n$ such that
@@ -703,13 +704,18 @@ and
 T^{(L+1)}(n)=T^{(L)}(n)\pmod 2.
 \]
 
-To obtain the additional parity equality, append the final bit of $x$ to $x$
-and apply parity-vector realisability. Adding a sufficiently large power of
-two makes the resulting starting value positive without changing any of these
-parities.
+\noindent To prove this, append a copy of the final bit of $x$ to the vector.
+Parity-vector realisability supplies a starting value for this extended
+vector. Adding $2^{L+2}$ makes the starting value positive without changing
+these parities.
+
+Equal parities at steps $L$ and $L+1$ imply that $T^{(L)}(n)>2$. If the
+trajectory had reached $1$ at some step $k\le L$, every subsequent value
+through step $L$ would belong to the cycle $1,2,1,2,\ldots$, contradicting
+$T^{(L)}(n)>2$. Therefore, $T^{(k)}(n)=1$ implies $k>L$.
 \<close>
 
-lemma paper_theorem_1:
+lemma parity_vector_realizable_with_matching_next_parity:
   assumes x_len: "length x = Suc L"
   shows "\<exists>n>0.
            parity_vec n (Suc L) = x \<and>
@@ -894,10 +900,10 @@ that $p = u @ s @ v$.
 The choice of substring containment is deliberately strong.  It provides a
 simple, syntactic notion of explicit information storage that is easy to reason
 about formally and avoids ambiguity about how information is represented inside
-a proof certificate. In the main barrier theorem, we exploit only the elementary 
-consequence that storing a string of length $m$ requires at least $m$ bits of space.  
-Stronger notions of information encoding (for example, distributed or implicit
-encodings) are intentionally left outside the scope of this development.
+a proof certificate. In the main barrier theorem, literal containment implies that 
+the encoded parity vector cannot be longer than the proof certificate. The separately
+established incompressibility condition ensures that the chosen vector cannot
+be represented by an encoding shorter than the vector itself.
 \<close>
 
 definition contains :: "bitstring \<Rightarrow> bitstring \<Rightarrow> bool"
@@ -943,8 +949,9 @@ next
     by (auto simp: inj_on_def)
   ultimately show ?case
     using Suc.IH card_Un_disjoint card_image
-    by (smt (verit) Suc_1 Suc_pred card.infinite diff_add_zero mult_2 nat.discI 
-       plus_1_eq_Suc power_Suc0_right power_add power_eq_0_iff zero_less_one)
+    by (smt (verit) Suc_1 Suc_pred card.infinite diff_add_zero mult_2 
+        nat.discI plus_1_eq_Suc power_Suc0_right power_add 
+        power_eq_0_iff zero_less_one)
 qed
 (* Incompressibility definitions *)
 definition compressible :: "bitstring \<Rightarrow> (bitstring \<Rightarrow> bitstring) \<Rightarrow> bool" where
@@ -971,12 +978,14 @@ lemma card_bitstrings_le_len:
   "card {s::bitstring. length s <= m} = sum (%i. 2 ^ i) {..m}"
 proof -
   let ?S = "\<lambda>i. {s::bitstring. length s = i}"
-  have union_eq: "{s::bitstring. length s <= m} = Union ((%i. ?S i) ` {..m})"
+  have union_eq: "{s::bitstring. length s <= m} = 
+                  Union ((%i. ?S i) ` {..m})"
     by auto
   have fin_index: "finite ({..m}::nat set)" by simp
   have fin_each: "!!i. i <= m ==> finite (?S i)"
     by (simp add: finite_bitstrings_of_len)
-  have disj: "!!i j. i <= m ==> j <= m ==> i ~= j ==> ?S i Int ?S j = {}"
+  have disj: "!!i j. i <= m ==> j <= m ==> i ~= j 
+    ==> ?S i Int ?S j = {}"
     by auto
   have "card (Union ((%i. ?S i) ` {..m})) = sum (%i. card (?S i)) {..m}"
     by (rule card_UN_disjoint) (use fin_index fin_each disj in auto)
@@ -1030,7 +1039,8 @@ next
     ultimately show False using card_less by linarith
   qed
 
-  then obtain t where tS: "t : ?S" and len: "~ length (enc t) <= r" by blast
+  then obtain t where tS: "t : ?S" and len: "~ length (enc t) <= r" 
+    by blast
   
   hence "length (enc t) \<ge> Suc r" by simp
   moreover from tS have "length t = Suc r" by auto
@@ -1041,54 +1051,51 @@ qed
 text \<open>
 \subsection*{Proof system locale}
 
-This locale states the information assumptions used in the proof from the
-earlier paper. A bitstring $p$ represents a proposed proof, and its length is
-the number $L$ used in the argument.
+This locale states the information assumptions used in the argument. A
+bitstring $p$ represents a proposed proof, and its length is the number $L$
+used in the argument.
 
 \begin{enumerate}
-\item \textbf{Theorem 2 (trace specification).}
-If $p$ proves that a particular positive $n$ reaches $1$, and every such
-stopping time is greater than $L=\text{length}(p)$, then $p$ contains an
-encoding of the parity vector
+\item \textbf{Trace specification.}
+If $p$ proves that a particular positive $n$ reaches $1$, and the trajectory
+does not reach $1$ during its first $L=\text{length}(p)$ iterations, then $p$
+contains an encoding of the parity vector
 \[
 (n,T(n),\ldots,T^{(L)}(n))\pmod 2.
 \]
 
 \item \textbf{Universal instantiation.}
-If $p$ proves the ordinary Collatz conjecture, then for every positive $n$ it
+If $p$ proves the Collatz conjecture, then for every positive $n$ it
 proves the instance
 \[
 \exists k.\ T^{(k)}(n)=1.
 \]
 \end{enumerate}
 
-\noindent The parity encoding is assumed injective. The elementary counting theorem
-above then supplies a vector $x$ of length $L+1$ that cannot be encoded in
-fewer than $L+1$ bits. Thus no additional incompressibility-preservation
-assumption is needed.
+\noindent The parity encoding is assumed injective. The counting argument above
+then supplies a vector $x$ of length $L+1$ whose encoding has length at least
+$L+1$.
 
-\subsection*{The role of Theorem 2}
+\subsection*{The role of trace specification}
 
-The assumption
+Let $L=\text{length}(p)$. Suppose that $p$ proves that a positive integer
+$n$ eventually reaches $1$, but
 \[
-\begin{aligned}
-&\text{proves\_reaches\_one}(p,n)\ \land\\
-&\quad\forall k\,
-  (T^{(k)}(n)=1\longrightarrow \text{length}(p)<k)\\
-&\qquad\Longrightarrow
-p\ \text{contains}\
-\text{enc\_parity}(\textit{parity\_vec}\ n\,
-(\text{length}(p)+1))
-\end{aligned}
+T^{(k)}(n)\ne 1 \qquad\text{for every } k\le L.
 \]
-is the formal counterpart of Theorem 2 in the earlier paper. It says that when
-the trajectory cannot reach $1$ during its first $L$ steps, a proof of eventual
-convergence must specify the $L+1$ parity values governing those steps.
+The trace--specification assumption requires $p$ to contain an encoding of
+the parity vector
+\[
+(n,T(n),\ldots,T^{(L)}(n))\pmod 2.
+\]
+\noindent In other words, the proof must specify the first $L+1$ parity values of the
+trajectory.
 
 \paragraph{1. Realisability of all parity vectors}
-For the Collatz map, every finite bitstring occurs as a parity vector. As a result, 
-a trace-based proof of universal convergence cannot exclude any finite parity pattern 
-merely because that pattern is impossible. By contrast, consider the function
+For the Collatz map, every finite sequence of even and odd values occurs at
+the beginning of some trajectory. Therefore, a trace-based proof that applies
+to every starting value must allow for every finite parity pattern. By contrast, 
+consider the function
 \[
 T_1(n) =
 \begin{cases}
@@ -1125,13 +1132,12 @@ where the parameters $(k,s,c)$ depend on the parity vector. As shown earlier,
 these parameters uniquely determine the parity vector. Consequently, specifying 
 the complete affine parameter triple implicitly determines the full parity sequence.
 
-\subsection*{Why these properties motivate Theorem 2}
+\subsection*{Why these properties motivate trace specification}
 
 The Collatz function simultaneously satisfies the following three properties:
 \begin{enumerate}
 \item Every bitstring is realisable as a parity vector.
-\item The behaviour of the iteration is unpredictable without branch
-      information.
+\item Step-by-step evaluation of the iteration depends on branch information.
 \item The affine parameters encode the parity vector injectively.
 \end{enumerate}
 
@@ -1140,22 +1146,22 @@ opposite monotonicity makes parity information indispensable, and
 injectivity shows that affine data and parity data are equivalent, these properties 
 motivate the trace-specification assumption that proofs effectively encode the
 relevant parity vector. The final result is conditional on this assumption:
-the Isabelle development does not derive Theorem 2 from the rules of an
-arbitrary formal proof system.\<close>
+the Isabelle development does not derive trace specification from the rules
+of an arbitrary formal proof system.\<close>
 
 locale Collatz_Trace_Barrier =
   fixes enc_parity :: "bool list \<Rightarrow> bitstring"
     and proves_reaches_one :: "bitstring \<Rightarrow> nat \<Rightarrow> bool"
     and is_collatz_proof :: "bitstring \<Rightarrow> bool"
   assumes enc_parity_injective: "inj enc_parity"
-  (* THEOREM 2 OF THE EARLIER PAPER: the required prefix must be specified *)
-  assumes theorem2_trace_specification:
+  (* The required parity prefix must be specified *)
+  assumes trace_specification:
     "[| proves_reaches_one p n;
         n > 0;
         ALL k. Tpow k n = 1 --> length p < k |]
      ==> contains p
           (enc_parity (parity_vec n (Suc (length p))))"
-  (* A proof of the ordinary conjecture proves every positive instance *)
+(* A proof of the Collatz conjecture proves every positive instance *)
   assumes collatz_proof_instances:
     "is_collatz_proof p ==> ALL n>0. proves_reaches_one p n"
 begin
@@ -1168,12 +1174,12 @@ text \<open>
 \subsection*{Interpretation of the main theorem}
 
 Suppose that $p$ is a proof and let $L=\text{length}(p)$. Choose an
-incompressible vector $x$ of length $L+1$. The formalised Theorem 1 supplies a
-positive $n$ whose first $L+1$ parity values equal $x$, with equal parities at
-steps $L$ and $L+1$. Hence $T^{(L)}(n)>2$, and if $T^{(k)}(n)=1$, then $k>L$.
-Theorem 2 requires $p$ to contain the encoded vector $x$. Its encoding has
-length at least $L+1$, whereas every substring of $p$ has length at most $L$.
-This is the contradiction in the original paper.
+incompressible vector $x$ of length $L+1$. The preceding realisability result
+supplies a positive $n$ whose first $L+1$ parity values equal $x$ and whose
+parities at steps $L$ and $L+1$ are equal. Hence $T^{(L)}(n)>2$, and if $T^{(k)}(n)=1$, 
+then $k>L$. The trace--specification assumption requires $p$ to contain the encoded vector
+$x$. Its encoding has length at least $L+1$, whereas every substring of $p$
+has length at most $L$. This is the required contradiction.
 \<close>
 
 theorem no_finite_collatz_proof:
@@ -1191,7 +1197,7 @@ proof -
     pv_eq: "parity_vec n (Suc L) = x" and
     same_parity:
       "odd (Tpow (Suc L) n) = odd (Tpow L n)"
-    using paper_theorem_1[OF x_len]
+    using parity_vector_realizable_with_matching_next_parity[OF x_len]
     by blast
   have all_stopping_times_large:
     "ALL k. Tpow k n = 1 --> L < k"
@@ -1208,7 +1214,7 @@ proof -
     have trace_contained:
       "contains p
         (enc_parity (parity_vec n (Suc (length p))))"
-      using theorem2_trace_specification[OF instance_proof n_pos]
+      using trace_specification[OF instance_proof n_pos]
         all_stopping_times_large
       by (simp add: L_def)
     show ?thesis
