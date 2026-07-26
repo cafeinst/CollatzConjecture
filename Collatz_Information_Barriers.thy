@@ -12,14 +12,19 @@ Machine-Checked Formalization in Isabelle/HOL
 \subsection*{Abstract}
 
 In an earlier paper, \emph{The Collatz $3n+1$ Conjecture is Unprovable}
-(2012), the author argued that any proof of the Collatz conjecture would need
-to contain arbitrarily large amounts of information about the parity pattern of
-Collatz trajectories, making a finite proof impossible. The present work
-formalises that idea in Isabelle/HOL. Under explicit assumptions about how
-proofs store and preserve information, we prove that no finite proof
-can establish the required convergence property. This yields a
-machine-checked information-theoretic barrier theorem inspired by the earlier
-argument.
+(2012), the author gave an information--theoretic argument against the
+existence of a formal proof of the Collatz conjecture. The present work
+formalises that argument in Isabelle/HOL using the original formulation
+\[
+\forall n>0.\ \exists k.\ T^{(k)}(n)=1.
+\]
+Given a proposed proof of length $L$, the formal argument chooses an
+incompressible parity vector of length $L+1$, realises it as the beginning of a
+Collatz trajectory, and arranges that the next parity agrees with the final
+parity in the vector. This forces any occurrence of $1$ to come after step
+$L$. Under an explicit formal version of Theorem 2 of the earlier paper,
+requiring the proof to specify this parity information, a contradiction
+follows.
 
 \tableofcontents
 
@@ -50,22 +55,26 @@ and comments, and helping diagnose or structure Isabelle/HOL proof scripts.
 \subsection*{Main goal}
 
 The present development investigates the consequences of requiring a proof system 
-to represent Collatz trace information explicitly. The resulting theorem
-establishes an information-theoretic barrier for a broad class of trace-based
-proof methods based on explicit representations of parity information.
+to represent Collatz trace information explicitly. The resulting theorem establishes 
+an information-theoretic barrier for the specified class of trace-based proof methods 
+that explicitly represent parity information.
 
 \subsection*{High-level strategy}
 
 The argument formalised here isolates the following phenomena:
 
 \begin{enumerate}
-\item Certain proof strategies must expose or encode complete computational
-traces of the Collatz iteration (parity vectors).
-\item The Collatz map realises parity vectors of arbitrary length, including
-information--theoretically incompressible ones.
-\item Under explicit assumptions governing how proofs represent information,
-finite proof certificates cannot accommodate arbitrarily long
-incompressible traces.
+\item If a proposed proof has length $L$, an incompressible parity vector of
+length $L+1$ can be chosen.
+\item The Collatz map realises that vector as the first $L+1$ parities of a
+positive trajectory, while also making the parities at steps $L$ and $L+1$
+equal.
+\item The equality of these two parities implies that the value at step $L$ is
+greater than $2$, and therefore any step at which the trajectory equals $1$
+must occur after step $L$.
+\item Under the trace--specification principle corresponding to Theorem 2 of
+the earlier paper, the proposed proof must contain an encoding of the chosen
+$L+1$ bits, contradicting its length $L$.
 \end{enumerate}
 
 \noindent The structure of the argument is inspired by Chaitin--style incompressibility
@@ -99,10 +108,10 @@ inherent to the Collatz dynamics.
 We introduce an abstract model of proof certificates based on bitstrings,
 substring containment, and information--theoretic compressibility.
 
-\item[6. A trace--based barrier theorem]
-Under explicit assumptions on trace containment, incompressibility
-preservation, and unbounded verification, we derive a formal barrier result:
-no finite proof exists within this class of proof systems.
+\item[6. The original information--barrier argument]
+We formalise the proof from the earlier paper for the ordinary Collatz
+conjecture. The formal theorem is conditional on the trace--specification
+principle corresponding to Theorem 2 of that paper.
 
 \end{description}
 \<close>
@@ -132,25 +141,12 @@ abbreviation Tpow :: "nat \<Rightarrow> nat \<Rightarrow> nat"
   where "Tpow k n \<equiv> (T ^^ k) n"
 
 text \<open>
-\subsection*{The Collatz conjecture (unbounded version)}
+\subsection*{The Collatz conjecture}
 
-The standard formulation of the Collatz conjecture is:
+The formulation used in the earlier paper, and throughout this development, is:
 \[
-\forall n.\ \exists k.\ T^{(k)}(n) = 1.
+\forall n>0.\ \exists k.\ T^{(k)}(n) = 1.
 \]
-
-\noindent An unbounded formulation is:
-\[
-\forall n\ \forall L.\ \exists k \ge L.\ T^{(k)}(n) = 1.
-\]
-
-\noindent These formulations are equivalent: Once a number reaches $1$, the Collatz
-iteration enters the cycle
-\[
-1 \to 2 \to 1 \to 2 \to \cdots
-\]
-and therefore reaches $1$ infinitely many times. Consequently, for any
-threshold $L$, there exists some $k \ge L$ such that $T^{(k)}(n) = 1$.
 
 \subsection*{The parity vector as computational trace}
 
@@ -184,6 +180,9 @@ T(27) = 41,\quad T^{(2)}(27) = 62,\quad T^{(3)}(27) = 31.
 \end{aligned}
 \]
 \<close>
+
+definition collatz_conjecture :: bool where
+  "collatz_conjecture \<longleftrightarrow> (\<forall>n>0. \<exists>k. Tpow k n = 1)"
 
 definition parity_vec :: "nat \<Rightarrow> nat \<Rightarrow> bool list"
   where "parity_vec n k = map (\<lambda>i. odd (Tpow i n)) [0..<k]"
@@ -691,6 +690,192 @@ next
   qed
 qed
 
+text \<open>
+\subsection*{Theorem 1 in the form used in the earlier paper}
+
+Let $x$ be a bit vector of length $L+1$. There is a positive natural number
+$n$ such that
+\[
+x=(n,T(n),\ldots,T^{(L)}(n))\pmod 2
+\]
+and
+\[
+T^{(L+1)}(n)=T^{(L)}(n)\pmod 2.
+\]
+
+To obtain the additional parity equality, append the final bit of $x$ to $x$
+and apply parity-vector realisability. Adding a sufficiently large power of
+two makes the resulting starting value positive without changing any of these
+parities.
+\<close>
+
+lemma paper_theorem_1:
+  assumes x_len: "length x = Suc L"
+  shows "\<exists>n>0.
+           parity_vec n (Suc L) = x \<and>
+           odd (Tpow (Suc L) n) = odd (Tpow L n)"
+proof -
+  let ?y = "x @ [x ! L]"
+  obtain m where m_realizes:
+    "parity_vec m (length ?y) = ?y"
+    using parity_vector_realizable[of ?y] by blast
+  define n where "n = m + 2 ^ Suc (Suc L)"
+  have y_len: "length ?y = Suc (Suc L)"
+    using x_len by simp
+  have m_realizes':
+    "parity_vec m (Suc (Suc L)) = ?y"
+    using m_realizes y_len by simp
+  have invariant:
+    "parity_vec n (Suc (Suc L)) =
+     parity_vec m (Suc (Suc L))"
+    using parity_vec_add_pow2_invariant[of m 1 "Suc (Suc L)"]
+    by (simp add: n_def)
+  have n_realizes:
+    "parity_vec n (Suc (Suc L)) = ?y"
+    using invariant m_realizes' by simp
+  have n_pos: "n > 0"
+    by (simp add: n_def)
+  have prefix:
+    "parity_vec n (Suc L) = x"
+  proof -
+    have "parity_vec n (Suc L) =
+          take (Suc L) (parity_vec n (Suc (Suc L)))"
+      by (simp add: parity_vec_def take_map)
+    also have "... = take (Suc L) ?y"
+      by (simp add: n_realizes)
+    also have "... = x"
+      using x_len by simp
+    finally show ?thesis .
+  qed
+  have at_L:
+    "odd (Tpow L n) = x ! L"
+  proof -
+    have x_nonempty: "x \<noteq> []"
+      using x_len by auto
+
+    have "odd (Tpow L n) =
+          last (parity_vec n (Suc L))"
+      by (simp add: parity_vec_def)
+    also have "... = last x"
+      by (simp add: prefix)
+    also have "... = x ! (length x - 1)"
+      by (rule last_conv_nth[OF x_nonempty])
+    also have "... = x ! L"
+      using x_len by simp
+    finally show ?thesis .
+  qed
+
+  have at_Suc_L:
+    "odd (Tpow (Suc L) n) = x ! L"
+  proof -
+    have "odd (Tpow (Suc L) n) =
+          last (parity_vec n (Suc (Suc L)))"
+      by (simp add: parity_vec_def)
+    also have "... = last ?y"
+      by (simp add: n_realizes)
+    also have "... = x ! L"
+      by simp
+    finally show ?thesis .
+  qed
+  show ?thesis
+    using n_pos prefix at_L at_Suc_L by blast
+qed
+
+lemma T_positive:
+  assumes "n > 0"
+  shows "T n > 0"
+proof (cases "even n")
+  case True
+  then obtain q where n_eq: "n = 2 * q"
+    by (elim evenE)
+  have "q > 0"
+    using assms n_eq by simp
+  then show ?thesis
+    using True by (simp add: T_def n_eq)
+next
+  case False
+  then obtain q where n_eq: "n = 2 * q + 1"
+    by (elim oddE)
+  then show ?thesis
+    by (simp add: T_def)
+qed
+
+lemma Tpow_positive:
+  assumes "n > 0"
+  shows "Tpow k n > 0"
+  using assms
+proof (induction k arbitrary: n)
+  case 0
+  then show ?case by simp
+next
+  case (Suc k)
+  have iter_pos: "Tpow k n > 0"
+    using Suc.IH Suc.prems by blast
+  have "T (Tpow k n) > 0"
+    using T_positive[OF iter_pos] .
+  then show ?case
+    by (simp add: funpow_Suc_right)
+qed
+
+lemma equal_successive_parity_imp_gt_two:
+  assumes n_pos: "n > 0"
+    and same_parity:
+      "odd (Tpow (Suc L) n) = odd (Tpow L n)"
+  shows "Tpow L n > 2"
+proof -
+  have step:
+    "Tpow (Suc L) n = T (Tpow L n)"
+    by (simp add: funpow_Suc_right)
+  have iter_pos: "Tpow L n > 0"
+    using Tpow_positive n_pos by blast
+  have not_one: "Tpow L n \<noteq> 1"
+    using same_parity step by (auto simp: T_def)
+  have not_two: "Tpow L n \<noteq> 2"
+    using same_parity step by (auto simp: T_def)
+  show ?thesis
+    using iter_pos not_one not_two by linarith
+qed
+
+lemma Tpow_one_le_two:
+  "Tpow j 1 \<le> 2"
+proof -
+  have "Tpow j 1 = 1 \<or> Tpow j 1 = 2"
+  proof (induction j)
+    case 0
+    then show ?case by simp
+  next
+    case (Suc j)
+    then show ?case
+      by (auto simp: funpow_Suc_right T_def)
+  qed
+  then show ?thesis by auto
+qed
+
+lemma reaches_one_only_after_L:
+  assumes n_pos: "n > 0"
+    and same_parity:
+      "odd (Tpow (Suc L) n) = odd (Tpow L n)"
+    and reaches: "Tpow k n = 1"
+  shows "k > L"
+proof (rule ccontr)
+  assume "\<not> k > L"
+  then have k_le: "k \<le> L" by simp
+  have L_decomp: "L = (L - k) + k"
+    using k_le by simp
+  have "Tpow L n = Tpow ((L - k) + k) n"
+    by (rule arg_cong[OF L_decomp])
+  also have "... = Tpow (L - k) (Tpow k n)"
+    by (simp add: funpow_add)
+  also have "... = Tpow (L - k) 1"
+    by (simp add: reaches)
+  also have "... \<le> 2"
+    by (rule Tpow_one_le_two)
+  finally have "Tpow L n \<le> 2" .
+  moreover have "Tpow L n > 2"
+    using equal_successive_parity_imp_gt_two[OF n_pos same_parity] .
+  ultimately show False by simp
+qed
+
 section \<open>Proof system setup\<close>
 
 type_synonym bit = bool
@@ -856,49 +1041,54 @@ qed
 text \<open>
 \subsection*{Proof system locale}
 
-This locale models a class of proof-certificate encodings used by trace-based 
-approaches to Collatz. We introduce three explicit assumptions capturing 
-a class of trace-based proof systems.
+This locale states the information assumptions used in the proof from the
+earlier paper. A bitstring $p$ represents a proposed proof, and its length is
+the number $L$ used in the argument.
 
 \begin{enumerate}
-\item \textbf{Containment.}
-Proofs must encode parity information. This is not derived from first
-principles, but is assumed based on structural properties of the Collatz
-function, namely realisability, injectivity of the affine formula, and opposite
-monotonicity.
+\item \textbf{Theorem 2 (trace specification).}
+If $p$ proves that a particular positive $n$ reaches $1$, and every such
+stopping time is greater than $L=\text{length}(p)$, then $p$ contains an
+encoding of the parity vector
+\[
+(n,T(n),\ldots,T^{(L)}(n))\pmod 2.
+\]
 
-\item \textbf{Incompressibility preservation.}
-The encoding cannot compress truly incompressible information. This is a basic
-information-theoretic constraint.
-
-\item \textbf{Unbounded verification.}
-A proof of the Collatz conjecture must work for arbitrarily large iteration
-counts. This follows from the equivalence of the standard and unbounded
-formulations.
+\item \textbf{Universal instantiation.}
+If $p$ proves the ordinary Collatz conjecture, then for every positive $n$ it
+proves the instance
+\[
+\exists k.\ T^{(k)}(n)=1.
+\]
 \end{enumerate}
 
-\noindent The resulting unprovability statement is therefore conditional. If every valid
-proof must encode parity vectors, and if such encodings preserve
-information-theoretic incompressibility, then no finite proof of the Collatz
-$3n+1$ conjecture can exist.
+\noindent The parity encoding is assumed injective. The elementary counting theorem
+above then supplies a vector $x$ of length $L+1$ that cannot be encoded in
+fewer than $L+1$ bits. Thus no additional incompressibility-preservation
+assumption is needed.
 
-\subsection*{Justification of the containment assumption}
+\subsection*{The role of Theorem 2}
 
 The assumption
 \[
-\text{is\_proof\_of\_convergence}(p,k,n) \Longrightarrow
-p\ \text{contains}\ \text{enc\_parity}(\textit{parity\_vec}\ n\ k)
+\begin{aligned}
+&\text{proves\_reaches\_one}(p,n)\ \land\\
+&\quad\forall k\,
+  (T^{(k)}(n)=1\longrightarrow \text{length}(p)<k)\\
+&\qquad\Longrightarrow
+p\ \text{contains}\
+\text{enc\_parity}(\textit{parity\_vec}\ n\,
+(\text{length}(p)+1))
+\end{aligned}
 \]
-formalises the idea that any proof asserting that $n$ converges to $1$ within
-$k$ steps must, at least implicitly, encode the parity vector of the first $k$
-Collatz iterates of $n$. This assumption is justified by three structural properties 
-that are specific to the Collatz function.
+is the formal counterpart of Theorem 2 in the earlier paper. It says that when
+the trajectory cannot reach $1$ during its first $L$ steps, a proof of eventual
+convergence must specify the $L+1$ parity values governing those steps.
 
 \paragraph{1. Realisability of all parity vectors}
-For the Collatz map, every finite bitstring occurs as a parity vector. As a
-result, any proof of universal convergence must account for all possible parity
-patterns; none can be excluded a priori.
-By contrast, consider the function
+For the Collatz map, every finite bitstring occurs as a parity vector. As a result, 
+a trace-based proof of universal convergence cannot exclude any finite parity pattern 
+merely because that pattern is impossible. By contrast, consider the function
 \[
 T_1(n) =
 \begin{cases}
@@ -914,9 +1104,8 @@ strings.
 \paragraph{2. Opposite monotonicity}
 In the Collatz map, even steps always decrease the value, while odd steps always
 increase it. Because the size may increase or decrease depending on the parity,
-the behaviour of the iteration cannot be understood without knowing which branch
-was taken at each step.
-By contrast, consider the function
+a step-by-step evaluation of the trajectory depends on knowing which branch was 
+taken at each step. By contrast, consider the function
 \[
 T_2(n) =
 \begin{cases}
@@ -933,11 +1122,10 @@ For the Collatz map, we have the identity
 T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k},
 \]
 where the parameters $(k,s,c)$ depend on the parity vector. As shown earlier,
-these parameters uniquely determine the parity vector. Consequently, any argument
-that relies on the affine formula implicitly determines the full parity
-sequence.
+these parameters uniquely determine the parity vector. Consequently, specifying 
+the complete affine parameter triple implicitly determines the full parity sequence.
 
-\subsection*{Why these properties force parity encoding}
+\subsection*{Why these properties motivate Theorem 2}
 
 The Collatz function simultaneously satisfies the following three properties:
 \begin{enumerate}
@@ -947,100 +1135,99 @@ The Collatz function simultaneously satisfies the following three properties:
 \item The affine parameters encode the parity vector injectively.
 \end{enumerate}
 
-\noindent Because realisability forces a proof to account for all parity patterns, 
+\noindent Because realisability forces a trace-based proof to account for all parity patterns,
 opposite monotonicity makes parity information indispensable, and 
 injectivity shows that affine data and parity data are equivalent, these properties 
-provide strong justification for the containment assumption that proofs effectively 
-encode the relevant parity vector. Since these properties fail for many superficially 
-similar functions, the containment assumption is not arbitrary; it reflects a genuine 
-structural feature of the actual Collatz dynamics.\<close>
+motivate the trace-specification assumption that proofs effectively encode the
+relevant parity vector. The final result is conditional on this assumption:
+the Isabelle development does not derive Theorem 2 from the rules of an
+arbitrary formal proof system.\<close>
 
 locale Collatz_Trace_Barrier =
   fixes enc_parity :: "bool list \<Rightarrow> bitstring"
-    and is_proof_of_convergence :: "bitstring \<Rightarrow> nat \<Rightarrow> nat \<Rightarrow> bool"
+    and proves_reaches_one :: "bitstring \<Rightarrow> nat \<Rightarrow> bool"
     and is_collatz_proof :: "bitstring \<Rightarrow> bool"
-  (* ASSUMPTION 1: Proofs must contain encoded parity information *)
-  assumes proof_contains_parity:
-    "is_proof_of_convergence p k n
-     ==> contains p (enc_parity (parity_vec n k))"
-  (* ASSUMPTION 2: Encoding preserves incompressibility *)
-  assumes encoding_preserves_incompressibility:
-    "[| incompressible_by s enc_parity; length s = m; take m t = s |]
-     ==> length (enc_parity t) >= m"
-  (* ASSUMPTION 3: Collatz proofs work for unbounded iterations *)
-  assumes collatz_proof_unbounded:
-    "is_collatz_proof p ==> ALL n L. EX k>=L. is_proof_of_convergence p k n"
+  assumes enc_parity_injective: "inj enc_parity"
+  (* THEOREM 2 OF THE EARLIER PAPER: the required prefix must be specified *)
+  assumes theorem2_trace_specification:
+    "[| proves_reaches_one p n;
+        n > 0;
+        ALL k. Tpow k n = 1 --> length p < k |]
+     ==> contains p
+          (enc_parity (parity_vec n (Suc (length p))))"
+  (* A proof of the ordinary conjecture proves every positive instance *)
+  assumes collatz_proof_instances:
+    "is_collatz_proof p ==> ALL n>0. proves_reaches_one p n"
 begin
 
 lemma incompressible_parity_encodings_exist:
-  assumes "inj enc_parity"
   shows "\<exists>s. length s = m \<and> incompressible_by s enc_parity"
-  using incompressible_strings_exist_for_enc[OF assms] .
-
-lemma parity_vec_prefix:
-  assumes "m \<le> k"
-  shows   "take m (parity_vec n k) = parity_vec n m"
-  using assms by (simp add: parity_vec_def take_map)
+  using incompressible_strings_exist_for_enc[OF enc_parity_injective] .
 
 text \<open>
 \subsection*{Interpretation of the main theorem}
 
-Under Assumptions (1)–(3), no finite proof exists within this class of proof 
-systems. The theorem is conditional on these assumptions, which are motivated 
-by structural properties of the Collatz map.
+Suppose that $p$ is a proof and let $L=\text{length}(p)$. Choose an
+incompressible vector $x$ of length $L+1$. The formalised Theorem 1 supplies a
+positive $n$ whose first $L+1$ parity values equal $x$, with equal parities at
+steps $L$ and $L+1$. Hence $T^{(L)}(n)>2$, and if $T^{(k)}(n)=1$, then $k>L$.
+Theorem 2 requires $p$ to contain the encoded vector $x$. Its encoding has
+length at least $L+1$, whereas every substring of $p$ has length at most $L$.
+This is the contradiction in the original paper.
 \<close>
 
 theorem no_finite_collatz_proof:
-  assumes "inj enc_parity"
-  assumes "is_collatz_proof p"
+  assumes p_proof: "is_collatz_proof p"
   shows False
 proof -
   define L where "L = length p"
-  (* By pigeonhole, an incompressible string exists *)
-  obtain s where 
-    s_len: "length s = Suc L" and 
-    s_incomp: "incompressible_by s enc_parity"
-    using incompressible_parity_encodings_exist[OF assms(1), of "Suc L"] 
+  obtain x where
+    x_len: "length x = Suc L" and
+    x_incomp: "incompressible_by x enc_parity"
+    using incompressible_parity_encodings_exist[of "Suc L"]
     by blast
-  (* By realizability, this parity vector is realized by some number *)
-  obtain n where pv_eq: "parity_vec n (Suc L) = s"
-    using parity_vector_realizable[of s] s_len by auto
-  (* By unbounded form, the proof must handle this number at large iterations *)
-  have "\<exists>k\<ge>Suc L. is_proof_of_convergence p k n"
-    using assms(2) collatz_proof_unbounded 
+  obtain n where
+    n_pos: "n > 0" and
+    pv_eq: "parity_vec n (Suc L) = x" and
+    same_parity:
+      "odd (Tpow (Suc L) n) = odd (Tpow L n)"
+    using paper_theorem_1[OF x_len]
     by blast
-
-  then obtain k where 
-    k_ge: "k \<ge> Suc L" and 
-    k_proof: "is_proof_of_convergence p k n" 
+  have all_stopping_times_large:
+    "ALL k. Tpow k n = 1 --> L < k"
+    using reaches_one_only_after_L[OF n_pos same_parity]
     by blast
-  (* The parity vector has s as its prefix *)
-  have "take (Suc L) (parity_vec n k) = parity_vec n (Suc L)"
-    using k_ge parity_vec_prefix by auto
-  also have "... = s" using pv_eq by simp
-  finally have prefix: "take (Suc L) (parity_vec n k) = s" .
-  (* By assumption 2, encoding s preserves its length *)
-  have enc_large: "length (enc_parity (parity_vec n k)) \<ge> Suc L"
-    using encoding_preserves_incompressibility[OF s_incomp s_len prefix] 
+  have instance_proof: "proves_reaches_one p n"
+    using collatz_proof_instances[OF p_proof] n_pos
     by blast
-  (* But the proof contains this encoding, so must be at least Suc L long *)
-  have contains_fact: "contains p (enc_parity (parity_vec n k))"
-    using proof_contains_parity[OF k_proof] .
-
-  have len_le: "length (enc_parity (parity_vec n k)) <= length p"
-    using contains_len_bound[OF contains_fact] .
-
+  have pv_eq':
+    "parity_vec n (Suc (length p)) = x"
+    using pv_eq by (simp add: L_def)
+  have contains_x: "contains p (enc_parity x)"
+  proof -
+    have trace_contained:
+      "contains p
+        (enc_parity (parity_vec n (Suc (length p))))"
+      using theorem2_trace_specification[OF instance_proof n_pos]
+        all_stopping_times_large
+      by (simp add: L_def)
+    show ?thesis
+      using trace_contained pv_eq' by simp
+  qed
+  have enc_large: "Suc L \<le> length (enc_parity x)"
+    using x_incomp x_len
+    by (simp add: incompressible_by_def compressible_def)
+  have enc_fits: "length (enc_parity x) \<le> length p"
+    using contains_len_bound[OF contains_x] .
   have "Suc L <= length p"
-    using enc_large len_le by linarith
-
-  thus False
+    using enc_large enc_fits by linarith
+  then show False
     by (simp add: L_def)
 qed
 
 corollary no_collatz_proof_in_this_system:
-  assumes "inj enc_parity"
   shows "\<not> (\<exists>p. is_collatz_proof p)"
-  using no_finite_collatz_proof[OF assms] 
+  using no_finite_collatz_proof
   by blast
 
 end (* End of locale *)
