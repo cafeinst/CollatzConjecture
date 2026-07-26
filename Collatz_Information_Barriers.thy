@@ -80,7 +80,7 @@ proof certificates rather than to the computation of specific strings.
 \begin{description}
 
 \item[1. Collatz map and parity vectors]
-We define the simplified Collatz function $T$ and formalise parity vectors as
+We define the Collatz function $T$ and formalise parity vectors as
 computational traces of the iterative process.
 
 \item[2. Affine formula characterisation]
@@ -1057,9 +1057,12 @@ used in the argument.
 
 \begin{enumerate}
 \item \textbf{Trace specification.}
-If $p$ proves that a particular positive $n$ reaches $1$, and the trajectory
-does not reach $1$ during its first $L=\text{length}(p)$ iterations, then $p$
-contains an encoding of the parity vector
+Let $L=\text{length}(p)$. If $p$ proves that a particular positive $n$
+reaches $1$, and
+\[
+T^{(L)}(n)>2,
+\]
+then $p$ contains an encoding of the parity vector
 \[
 (n,T(n),\ldots,T^{(L)}(n))\pmod 2.
 \]
@@ -1079,16 +1082,17 @@ $L+1$.
 \subsection*{The role of trace specification}
 
 Let $L=\text{length}(p)$. Suppose that $p$ proves that a positive integer
-$n$ eventually reaches $1$, but
+$n$ eventually reaches $1$, and
 \[
-T^{(k)}(n)\ne 1 \qquad\text{for every } k\le L.
+T^{(L)}(n)>2.
 \]
-The trace--specification assumption requires $p$ to contain an encoding of
-the parity vector
+As shown above, this implies that any $k$ satisfying $T^{(k)}(n)=1$ must
+satisfy $k>L$. The trace--specification assumption then requires $p$ to
+contain an encoding of the parity vector
 \[
 (n,T(n),\ldots,T^{(L)}(n))\pmod 2.
 \]
-\noindent In other words, the proof must specify the first $L+1$ parity values of the
+In other words, the proof must specify the first $L+1$ parity values of the
 trajectory.
 
 \paragraph{1. Realisability of all parity vectors}
@@ -1160,8 +1164,8 @@ locale Collatz_Trace_Barrier =
         n > 0;
         Tpow (length p) n > 2 |]
      ==> contains p
-        (enc_parity (parity_vec n (Suc (length p))))"
-(* A proof of the Collatz conjecture proves every positive instance *)
+          (enc_parity (parity_vec n (Suc (length p))))"
+  (* A proof of the Collatz conjecture proves every positive instance *)
   assumes collatz_proof_instances:
     "is_collatz_proof p ==> ALL n>0. proves_reaches_one p n"
 begin
