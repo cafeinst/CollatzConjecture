@@ -1158,9 +1158,9 @@ locale Collatz_Trace_Barrier =
   assumes trace_specification:
     "[| proves_reaches_one p n;
         n > 0;
-        ALL k. Tpow k n = 1 --> length p < k |]
+        Tpow (length p) n > 2 |]
      ==> contains p
-          (enc_parity (parity_vec n (Suc (length p))))"
+        (enc_parity (parity_vec n (Suc (length p))))"
 (* A proof of the Collatz conjecture proves every positive instance *)
   assumes collatz_proof_instances:
     "is_collatz_proof p ==> ALL n>0. proves_reaches_one p n"
@@ -1199,10 +1199,10 @@ proof -
       "odd (Tpow (Suc L) n) = odd (Tpow L n)"
     using parity_vector_realizable_with_matching_next_parity[OF x_len]
     by blast
-  have all_stopping_times_large:
-    "ALL k. Tpow k n = 1 --> L < k"
-    using reaches_one_only_after_L[OF n_pos same_parity]
-    by blast
+  have value_at_L_gt_two:
+    "Tpow (length p) n > 2"
+    using equal_successive_parity_imp_gt_two[OF n_pos same_parity]
+    by (simp add: L_def)
   have instance_proof: "proves_reaches_one p n"
     using collatz_proof_instances[OF p_proof] n_pos
     by blast
@@ -1214,8 +1214,8 @@ proof -
     have trace_contained:
       "contains p
         (enc_parity (parity_vec n (Suc (length p))))"
-      using trace_specification[OF instance_proof n_pos]
-        all_stopping_times_large
+      using trace_specification[
+        OF instance_proof n_pos value_at_L_gt_two]
       by (simp add: L_def)
     show ?thesis
       using trace_contained pv_eq' by simp
