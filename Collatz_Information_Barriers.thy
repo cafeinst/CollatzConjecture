@@ -420,7 +420,8 @@ qed
 lemma parity_vec_Suc:
   "parity_vec n (Suc k) = odd n # parity_vec (T n) k"
 proof (rule nth_equalityI)
-  show "length (parity_vec n (Suc k)) = length (odd n # parity_vec (T n) k)"
+  show "length (parity_vec n (Suc k)) = 
+        length (odd n # parity_vec (T n) k)"
     by simp
 next
   fix i assume iLt: "i < length (parity_vec n (Suc k))"
@@ -949,8 +950,8 @@ next
     by (auto simp: inj_on_def)
   ultimately show ?case
     using Suc.IH card_Un_disjoint card_image
-    by (smt (verit) Suc_1 Suc_pred card.infinite diff_add_zero mult_2 
-        nat.discI plus_1_eq_Suc power_Suc0_right power_add 
+    by (smt (verit) Suc_1 Suc_pred card.infinite diff_add_zero 
+        mult_2 nat.discI plus_1_eq_Suc power_Suc0_right power_add 
         power_eq_0_iff zero_less_one)
 qed
 (* Incompressibility definitions *)
@@ -1027,7 +1028,6 @@ next
   from Tm' have lt: "card ?T = 2 ^ Suc r - 1"
     by (simp add: sum_pow2_lt)
   from Sm lt have card_less: "card ?T < card ?S" by simp
-
   have not_all_shrink: "~(ALL t:?S. length (enc t) <= r)"
   proof
     assume H: "ALL t:?S. length (enc t) <= r"
@@ -1038,10 +1038,8 @@ next
       using card_image by (metis subset_UNIV subset_inj_on)
     ultimately show False using card_less by linarith
   qed
-
   then obtain t where tS: "t : ?S" and len: "~ length (enc t) <= r" 
-    by blast
-  
+    by blast 
   hence "length (enc t) \<ge> Suc r" by simp
   moreover from tS have "length t = Suc r" by auto
   ultimately show ?thesis 
