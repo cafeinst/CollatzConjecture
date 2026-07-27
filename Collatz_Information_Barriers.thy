@@ -705,15 +705,19 @@ and
 T^{(L+1)}(n)=T^{(L)}(n)\pmod 2.
 \]
 
-\noindent To prove this, append a copy of the final bit of $x$ to the vector.
-Parity-vector realisability supplies a starting value for this extended
-vector. Adding $2^{L+2}$ makes the starting value positive without changing
-these parities.
+\noindent To obtain matching parities at steps $L$ and $L+1$, append a copy
+of the final bit of $x$ to the vector. Parity-vector realisability, together
+with two-adic invariance, then supplies a positive starting value having this
+extended parity vector.
 
-Equal parities at steps $L$ and $L+1$ imply that $T^{(L)}(n)>2$. If the
-trajectory had reached $1$ at some step $k\le L$, every subsequent value
-through step $L$ would belong to the cycle $1,2,1,2,\ldots$, contradicting
-$T^{(L)}(n)>2$. Therefore, $T^{(k)}(n)=1$ implies $k>L$.
+Since $n$ is positive, every value in its trajectory is positive. If
+$T^{(L)}(n)=1$, then $T^{(L+1)}(n)=2$; if $T^{(L)}(n)=2$, then
+$T^{(L+1)}(n)=1$. In either case, the two values have opposite parities.
+Their equal parities therefore imply that $T^{(L)}(n)>2$.
+If the trajectory had reached $1$ at some step $k\le L$, every subsequent
+value through step $L$ would belong to the cycle $1,2,1,2,\ldots$, which
+would give $T^{(L)}(n) \le 2$. This contradicts $T^{(L)}(n)>2$. Therefore,
+$T^{(k)}(n)=1$ implies $k>L$.
 \<close>
 
 lemma parity_vector_realizable_with_matching_next_parity:
