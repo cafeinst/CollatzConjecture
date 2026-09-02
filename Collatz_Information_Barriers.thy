@@ -21,8 +21,6 @@ can establish the required convergence property. This yields a
 machine-checked information-theoretic barrier theorem inspired by the earlier
 argument.
 
-\tableofcontents
-
 \clearpage
 
 \subsection*{Provenance}
@@ -1097,11 +1095,17 @@ contain an encoding of the parity vector
 In other words, the proof must specify the first $L+1$ parity values of the
 trajectory.
 
+\subsection*{Motivation for the trace-specification assumption}
+
+The assumption of trace specification is justified by three structural properties 
+that are specific to the Collatz function.
+
 \paragraph{1. Realisability of all parity vectors}
-For the Collatz map, every finite sequence of even and odd values occurs at
-the beginning of some trajectory. Therefore, a trace-based proof that applies
-to every starting value must allow for every finite parity pattern. By contrast, 
-consider the function
+For the Collatz map, every finite bitstring occurs as a parity vector. As a
+result, any proof of universal convergence must account for all possible parity
+patterns; none can be excluded a priori.
+
+By contrast, consider the function
 \[
 T_1(n) =
 \begin{cases}
@@ -1115,10 +1119,11 @@ occurs. Proofs for $T_1$ therefore do not need to consider arbitrary parity
 strings.
 
 \paragraph{2. Opposite monotonicity}
-In the Collatz map, even steps always decrease the value, while odd steps always
-increase it. Because the size may increase or decrease depending on the parity,
-a step-by-step evaluation of the trajectory depends on knowing which branch was 
-taken at each step. By contrast, consider the function
+In the Collatz map, even steps decrease the value, while odd steps increase it. 
+Thus, the value itself does not provide a quantity that decreases at every step, 
+and convergence cannot be established merely by showing that both branches decrease.
+
+By contrast, consider the function
 \[
 T_2(n) =
 \begin{cases}
@@ -1126,34 +1131,37 @@ n/2 & \text{if $n$ is even},\\
 (n + 1)/2 & \text{if $n$ is odd}.
 \end{cases}
 \]
-Both branches decrease for $n > 1$, so convergence can be proved using a global
-monotone invariant, without referring to individual parity choices.
+Both branches decrease for $n > 1$, so convergence to $1$ follows
+by descent on the positive integers, without needing to specify
+the individual parity choices.
 
 \paragraph{3. Injectivity of the affine formula}
 For the Collatz map, we have the identity
 \[
-T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k},
+T^k(n) = \frac{3^s \cdot n + c}{2^k},
 \]
-where the parameters $(k,s,c)$ depend on the parity vector. As shown earlier,
-these parameters uniquely determine the parity vector. Consequently, specifying 
-the complete affine parameter triple implicitly determines the full parity sequence.
+where the parameters $(k,s,c)$ depend on the parity vector. As shown earlier, these 
+parameters uniquely determine the parity vector. Thus, specifying their exact values 
+determines the full parity sequence. This establishes an equivalence between the 
+information in the parity vector and its affine parameters, although a general 
+argument about those parameters need not specify an individual sequence.
 
 \subsection*{Why these properties motivate trace specification}
 
 The Collatz function simultaneously satisfies the following three properties:
 \begin{enumerate}
 \item Every bitstring is realisable as a parity vector.
-\item Step-by-step evaluation of the iteration depends on branch information.
+\item Even steps decrease the value, while odd steps increase it.
 \item The affine parameters encode the parity vector injectively.
 \end{enumerate}
 
-\noindent Because realisability forces a trace-based proof to account for all parity patterns,
-opposite monotonicity makes parity information indispensable, and 
-injectivity shows that affine data and parity data are equivalent, these properties 
-motivate the trace-specification assumption that proofs effectively encode the
-relevant parity vector. The final result is conditional on this assumption:
-the Isabelle development does not derive trace specification from the rules
-of an arbitrary formal proof system.\<close>
+\noindent Because every finite parity pattern is realisable, a proof of universal 
+convergence must cover all such patterns. Opposite monotonicity prevents a direct 
+descent argument based on the value decreasing at every step, 
+while injectivity shows that specifying the affine parameters also specifies the parity 
+vector. Together, these properties motivate the trace-specification assumption. The 
+final result is conditional on this assumption: the Isabelle development does not derive 
+trace specification from the rules of an arbitrary formal proof system.\<close>
 
 locale Collatz_Trace_Barrier =
   fixes enc_parity :: "bool list \<Rightarrow> bitstring"
