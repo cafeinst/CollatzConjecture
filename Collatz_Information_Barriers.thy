@@ -1143,8 +1143,7 @@ T^k(n) = \frac{3^s \cdot n + c}{2^k},
 where the parameters $(k,s,c)$ depend on the parity vector. As shown earlier, these 
 parameters uniquely determine the parity vector. Thus, specifying their exact values 
 determines the full parity sequence. This establishes an equivalence between the 
-information in the parity vector and its affine parameters, although a general 
-argument about those parameters need not specify an individual sequence.
+information in the parity vector and its affine parameters.
 
 \subsection*{Why these properties motivate trace specification}
 
