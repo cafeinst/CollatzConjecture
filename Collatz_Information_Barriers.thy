@@ -47,10 +47,8 @@ and comments, and helping diagnose or structure Isabelle/HOL proof scripts.
 
 \subsection*{Main goal}
 
-The present development investigates the consequences of requiring a proof system 
-to represent Collatz trace information explicitly. The resulting theorem establishes 
-an information-theoretic barrier for the specified class of trace-based proof methods 
-that explicitly represent parity information.
+The present development establishes an information-theoretic barrier
+for proof methods that explicitly store the required parity information.
 
 \subsection*{High-level strategy}
 
@@ -225,8 +223,7 @@ definition formula_of :: "bool list \<Rightarrow> nat \<times> nat \<times> nat"
 
 text \<open>
 \subsection*{Injectivity}
-Different parity vectors produce different affine formula parameters. In
-particular, distinct parity sequences yield distinct triples $(k,s,c)$ in the
+Different parity vectors produce distinct triples $(k,s,c)$ in the
 representation
 \[
 T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k}.
@@ -1079,26 +1076,10 @@ proves the instance
 then supplies a vector $x$ of length $L+1$ whose encoding has length at least
 $L+1$.
 
-\subsection*{The role of trace specification}
-
-Let $L=\text{length}(p)$. Suppose that $p$ proves that a positive integer
-$n$ eventually reaches $1$, and
-\[
-T^{(L)}(n)>2.
-\]
-As shown above, this implies that any $k$ satisfying $T^{(k)}(n)=1$ must
-satisfy $k>L$. The trace--specification assumption then requires $p$ to
-contain an encoding of the parity vector
-\[
-(n,T(n),\ldots,T^{(L)}(n))\pmod 2.
-\]
-In other words, the proof must specify the first $L+1$ parity values of the
-trajectory.
-
 \subsection*{Motivation for the trace-specification assumption}
 
-The assumption of trace specification is justified by three structural properties 
-that are specific to the Collatz function.
+The trace-specification assumption is motivated by three structural
+properties of the Collatz map.
 
 \paragraph{1. Realisability of all parity vectors}
 For the Collatz map, every finite bitstring occurs as a parity vector. As a
@@ -1140,27 +1121,14 @@ For the Collatz map, we have the identity
 \[
 T^k(n) = \frac{3^s \cdot n + c}{2^k},
 \]
-where the parameters $(k,s,c)$ depend on the parity vector. As shown earlier, these 
-parameters uniquely determine the parity vector. Thus, specifying their exact values 
-determines the full parity sequence. This establishes an equivalence between the 
-information in the parity vector and its affine parameters.
+where the parameters $(k,s,c)$ are determined by the parity vector.
+As shown earlier, this correspondence is injective, so specifying
+the exact parameters also determines the full parity sequence.
 
-\subsection*{Why these properties motivate trace specification}
-
-The Collatz function simultaneously satisfies the following three properties:
-\begin{enumerate}
-\item Every bitstring is realisable as a parity vector.
-\item Even steps decrease the value, while odd steps increase it.
-\item The affine parameters encode the parity vector injectively.
-\end{enumerate}
-
-\noindent Because every finite parity pattern is realisable, a proof of universal 
-convergence must cover all such patterns. Opposite monotonicity prevents a direct 
-descent argument based on the value decreasing at every step, 
-while injectivity shows that specifying the affine parameters also specifies the parity 
-vector. Together, these properties motivate the trace-specification assumption. The 
-final result is conditional on this assumption: the Isabelle development does not derive 
-trace specification from the rules of an arbitrary formal proof system.\<close>
+\bigskip\noindent Together, these properties motivate requiring proofs to encode the relevant 
+parity information. This requirement is expressed by the trace-specification assumption 
+below. The final result is conditional on that assumption: the Isabelle development does 
+not derive it from the rules of an arbitrary formal proof system.\<close>
 
 locale Collatz_Trace_Barrier =
   fixes enc_parity :: "bool list \<Rightarrow> bitstring"
