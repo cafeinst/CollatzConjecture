@@ -1100,9 +1100,9 @@ occurs. Proofs for $T_1$ therefore do not need to consider arbitrary parity
 strings.
 
 \paragraph{2. Opposite monotonicity}
-In the Collatz map, even steps decrease the value, while odd steps increase it. 
-Thus, the value itself does not provide a quantity that decreases at every step, 
-and convergence cannot be established merely by showing that both branches decrease.
+In the Collatz map, even steps decrease the value, while odd steps
+increase it. Consequently, descent of the value at every step
+cannot serve as a convergence argument.
 
 By contrast, consider the function
 \[
