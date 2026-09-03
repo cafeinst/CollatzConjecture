@@ -1048,9 +1048,8 @@ qed
 text \<open>
 \subsection*{Proof system locale}
 
-This locale states the information assumptions used in the argument. A
-bitstring $p$ represents a proposed proof, and its length is the number $L$
-used in the argument.
+This locale states the information assumptions used in the argument.
+A bitstring $p$ represents a proposed proof.
 
 \begin{enumerate}
 \item \textbf{Trace specification.}
