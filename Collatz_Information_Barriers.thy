@@ -209,17 +209,32 @@ particular, the parity vector encodes all computational information needed to
 reconstruct the affine formula for $T^{(k)}(n)$.
 \<close>
 
-fun params :: "nat \<Rightarrow> bool list \<Rightarrow> nat \<times> nat" where
-  "params i [] = (0, 0)" |
-  "params i (b # bs) =
-     (let (c,s) = params (Suc i) bs in
-      if b then (3*c + 2^i, Suc s) else (c, s))"
-
-definition params0 :: "bool list \<Rightarrow> nat \<times> nat" where
-  "params0 x = params 0 x"
+fun params0 :: "bool list \<Rightarrow> nat \<times> nat" where
+  "params0 [] = (0, 0)" |
+  "params0 (b # bs) =
+     (let (c,s) = params0 bs in
+      if b then (2*c + 3^s, Suc s) else (2*c, s))"
 
 definition formula_of :: "bool list \<Rightarrow> nat \<times> nat \<times> nat" where
   "formula_of x = (length x, snd (params0 x), fst (params0 x))"
+
+lemma params0_odd_count:
+  "snd (params0 xs) = length (filter id xs)"
+proof (induction xs)
+  case Nil
+  show ?case by simp
+next
+  case (Cons b bs)
+  obtain c s where P: "params0 bs = (c,s)"
+    by (cases "params0 bs") auto
+  have S: "s = length (filter id bs)"
+    using Cons.IH by (simp add: P id_def)
+  show ?case by (cases b) (simp_all add: P S id_def)
+qed
+
+lemma params0_two_odd_steps:
+  "params0 [True, True] = (5, 2)"
+  by simp
 
 text \<open>
 \subsection*{Injectivity}
@@ -230,151 +245,57 @@ T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k}.
 \]
 \<close>
 
-(* Helper lemma: the constant c from params is always divisible by appropriate powers of 2 *)
-lemma pow2_dvd_fst_params_Suc:
-  "2 ^ Suc i dvd fst (params (Suc i) zs)"
-proof (induction zs arbitrary: i)
-  case Nil
-  show ?case by simp
-next
-  case (Cons b bs)
-  obtain c s where P: "params (Suc (Suc i)) bs = (c, s)"
-    by (cases "params (Suc (Suc i)) bs") auto
-  from Cons.IH[of "Suc i"] P have IH: "2 ^ Suc (Suc i) dvd c" by simp
-  then obtain t where c_rep: "c = 2 ^ Suc (Suc i) * t"
-    by (auto simp: dvd_def)
-  have div_c: "2 ^ Suc i dvd c"
-  proof (unfold dvd_def, intro exI)
-    show "c = 2 ^ Suc i * (2 * t)"
-      by (simp add: c_rep)
-  qed
-  with P show ?case
-    by (cases b) simp_all
-qed
-(* Helper: dropping multiples on the left in modular arithmetic *)
-lemma mod_drop_left_multiple_nat:
-  fixes m a r :: nat
-  shows "(m * a + r) mod m = r mod m"
-  by (simp add: mod_add_left_eq mod_mult_left_eq)
-
-lemma params_injective_len:
-  assumes "length xs = length ys" and "params i xs = params i ys"
-  shows   "xs = ys"
+lemma params0_injective_len:
+  assumes "length xs = length ys" and "params0 xs = params0 ys"
+  shows "xs = ys"
   using assms
-proof (induction xs arbitrary: ys i)
+proof (induction xs arbitrary: ys)
   case Nil
   then show ?case by (cases ys) auto
 next
   case (Cons a xs)
-  from Cons.prems(1) obtain b ys' where [simp]: "ys = b # ys'"
+  from Cons.prems(1) obtain b zs where Y: "ys = b # zs"
     by (cases ys) auto
-  
-  obtain c s where Pxs: "params (Suc i) xs = (c,s)"
-    by (cases "params (Suc i) xs") auto
-  obtain c' s' where Pys: "params (Suc i) ys' = (c',s')"
-    by (cases "params (Suc i) ys'") auto
-
-  have Eq:
-    "(if a then (3*c + 2^i, Suc s) else (c,s)) =
-     (if b then (3*c' + 2^i, Suc s') else (c',s'))"
-    using Cons.prems(2) Pxs Pys by simp
-
-  have len_tails: "length xs = length ys'" using Cons.prems(1) by simp
-
-  show ?case
+  obtain c s where X: "params0 xs = (c,s)"
+    by (cases "params0 xs") auto
+  obtain d t where Z: "params0 zs = (d,t)"
+    by (cases "params0 zs") auto
+  have E:
+    "(if a then (2*c + 3^s, Suc s) else (2*c,s)) =
+     (if b then (2*d + 3^t, Suc t) else (2*d,t))"
+    using Cons.prems(2) by (simp add: Y X Z)
+  have H: "a = b"
   proof -
-    have "a = b"
-    proof (rule ccontr)
-      assume "a \<noteq> b"
-      then consider (TF) "a" "\<not> b" | (FT) "\<not> a" "b" by auto
-      then show False
-      proof cases
-        case TF
-        from pow2_dvd_fst_params_Suc[of i xs] Pxs 
-        have div_c:  "2 ^ Suc i dvd c"  by simp
-        from pow2_dvd_fst_params_Suc[of i ys'] Pys 
-        have div_c': "2 ^ Suc i dvd c'" by simp
-        let ?M = "2 ^ Suc i"
-
-        obtain t  where c_rep:  "c  = ?M * t"  
-          using div_c  by (auto simp: dvd_def)
-        obtain t' where c'rep: "c' = ?M * t'" 
-          using div_c' by (auto simp: dvd_def)
-
-        have Lmod: "(3 * c + 2 ^ i) mod ?M = 2 ^ i"
-        proof -
-          have "(3 * c + 2 ^ i) mod ?M
-              = ((?M * (3 * t)) + 2 ^ i) mod ?M" 
-            by (simp add: c_rep algebra_simps)
-          also have "... = (2 ^ i) mod ?M"
-            by (meson mod_drop_left_multiple_nat)
-          also have "... = 2 ^ i" by simp
-          finally show ?thesis .
-        qed
-
-        have Rmod: "c' mod ?M = 0" by (simp add: c'rep)
-
-        from Eq TF have "(3*c + 2^i, Suc s) = (c', s')" by simp
-        hence "(3*c + 2^i) = c'" by simp
-        hence "(3*c + 2^i) mod ?M = c' mod ?M" by simp
-        hence "2 ^ i = 0" using Lmod Rmod by simp
-        thus False using power_eq_0_iff by fastforce
-      next
-        case FT
-        from pow2_dvd_fst_params_Suc[of i ys'] Pys 
-        have div_c': "2 ^ Suc i dvd c'" by simp
-        from pow2_dvd_fst_params_Suc[of i xs]  Pxs 
-        have div_c:  "2 ^ Suc i dvd c"  by simp
-        let ?M = "2 ^ Suc i"
-
-        obtain t' where c'rep: "c' = ?M * t'" 
-          using div_c' by (auto simp: dvd_def)
-        obtain t  where c_rep:  "c  = ?M * t"  
-          using div_c  by (auto simp: dvd_def)
-
-        have Rmod: "(3 * c' + 2 ^ i) mod ?M = 2 ^ i"
-        proof -
-          have "(3 * c' + 2 ^ i) mod ?M
-              = ((?M * (3 * t')) + 2 ^ i) mod ?M" 
-            by (simp add: c'rep algebra_simps)
-          also have "... = (2 ^ i) mod ?M"
-            using mod_drop_left_multiple_nat by blast
-          also have "... = 2 ^ i" by simp
-          finally show ?thesis .
-        qed
-
-        have Lmod: "c mod ?M = 0" by (simp add: c_rep)
-
-        from Eq FT have "(c, s) = (3*c' + 2^i, Suc s')" by simp
-        hence "c = 3*c' + 2^i" by simp
-        hence "c mod ?M = (3*c' + 2^i) mod ?M" by simp
-        hence "0 = 2 ^ i" using Lmod Rmod by simp
-        thus False by (metis not_exp_less_eq_0_int verit_comp_simplify1(2))
-      qed
-    qed
-
-    then have bits_eq: "a = b" by simp
-    from Eq bits_eq have "c = c' \<and> s = s'" by (cases a) auto
-    hence "xs = ys'"
-      using Cons.IH[OF len_tails] Pxs Pys by metis
-    with bits_eq show ?thesis by simp
+    have "odd (fst (if a then (2*c + 3^s, Suc s) else (2*c,s))) =
+          odd (fst (if b then (2*d + 3^t, Suc t) else (2*d,t)))"
+      using E by simp
+    then show ?thesis by (cases a; cases b) simp_all
   qed
+  have ST: "s = t"
+    using E H by (cases a; cases b) auto
+  have CD: "c = d"
+    using E H ST by (cases a; cases b) auto
+  have P: "params0 xs = params0 zs"
+    using X Z CD ST by simp
+  have L: "length xs = length zs"
+    using Cons.prems(1) by (simp add: Y)
+  have "xs = zs" using Cons.IH[OF L P] .
+  then show ?case using H Y by simp
 qed
 
-(* Main injectivity theorem: formula uniquely determines parity vector *)
 lemma formula_determines_parity_on_len:
-  assumes "length x = k" "length y = k" "formula_of x = formula_of y"
-  shows   "x = y"
+  assumes "length x = k" "length y = k"
+    and "formula_of x = formula_of y"
+  shows "x = y"
 proof -
-  from assms(3) 
-  have "snd (params0 x) = snd (params0 y)" 
-       "fst (params0 x) = fst (params0 y)"
-    by (auto simp: formula_of_def)
-  hence "params0 x = params0 y" 
-    by (cases "params0 x"; cases "params0 y"; simp)
-  thus ?thesis
-    using assms(1,2) params_injective_len[of x y 0]
-    by (simp add: params0_def)
+  have P: "params0 x = params0 y"
+    using assms(3)
+    by (cases "params0 x"; cases "params0 y";
+        simp add: formula_of_def)
+  have L: "length x = length y"
+    using assms(1,2) by simp
+  show ?thesis
+    by (rule params0_injective_len[OF L P])
 qed
 
 section \<open>Two-adic invariance\<close>
@@ -434,6 +355,69 @@ next
     show ?thesis
       using S
       by (simp add: parity_vec_def T_funpow_commute del: upt_Suc)
+  qed
+qed
+
+lemma T_even_identity:
+  assumes "even n"
+  shows "2 * T n = n"
+proof -
+  obtain q where N: "n = 2*q" using assms by (elim evenE)
+  show ?thesis by (simp add: N T_def)
+qed
+
+lemma T_odd_identity:
+  assumes "odd n"
+  shows "2 * T n = 3*n + 1"
+proof -
+  obtain q where N: "n = 2*q + 1" using assms by (elim oddE)
+  show ?thesis by (simp add: N T_def algebra_simps)
+qed
+
+lemma collatz_affine_identity:
+  "2^k * Tpow k n =
+   3^(snd (params0 (parity_vec n k))) * n +
+   fst (params0 (parity_vec n k))"
+proof (induction k arbitrary: n)
+  case 0
+  show ?case by (simp add: parity_vec_def)
+next
+  case (Suc k)
+  obtain c s where P: "params0 (parity_vec (T n) k) = (c,s)"
+    by (cases "params0 (parity_vec (T n) k)") auto
+  have IH: "2^k * Tpow k (T n) = 3^s * T n + c"
+    using Suc.IH[of "T n"] by (simp add: P)
+  have D:
+    "2^(Suc k) * Tpow (Suc k) n = 3^s * (2 * T n) + 2*c"
+  proof -
+    have "2^(Suc k) * Tpow (Suc k) n =
+          2 * (2^k * Tpow k (T n))"
+      by (simp add: T_funpow_commute algebra_simps)
+    also have "... = 2 * (3^s * T n + c)" by (simp only: IH)
+    also have "... = 3^s * (2 * T n) + 2*c" by (simp add: algebra_simps)
+    finally show ?thesis .
+  qed
+  show ?case
+  proof (cases "even n")
+    case True
+    have Q: "params0 (parity_vec n (Suc k)) = (2*c,s)"
+      by (simp add: parity_vec_Suc P True)
+    show ?thesis using D T_even_identity[OF True] by (simp add: Q)
+  next
+    case False
+    have O: "odd n" using False by simp
+    have Q: "params0 (parity_vec n (Suc k)) =
+             (2*c + 3^s, Suc s)"
+      by (simp add: parity_vec_Suc P False)
+
+    have R:
+      "2^(Suc k) * Tpow (Suc k) n =
+       3^s * (3*n + 1) + 2*c"
+      using D
+      by (simp only: T_odd_identity[OF O])
+
+    show ?thesis
+      using R by (simp add: Q algebra_simps)
   qed
 qed
 
