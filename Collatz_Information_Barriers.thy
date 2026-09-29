@@ -1037,14 +1037,14 @@ A bitstring $p$ represents a proposed proof.
 
 \begin{enumerate}
 \item \textbf{Trace specification.}
-Let $L=\text{length}(p)$. If $p$ proves that a particular positive $n$
+For any natural number $k$, if $p$ proves that a particular positive $n$
 reaches $1$, and
 \[
-T^{(L)}(n)>2,
+T^{(k)}(n)>2,
 \]
 then $p$ contains an encoding of the parity vector
 \[
-(n,T(n),\ldots,T^{(L)}(n))\pmod 2.
+(n,T(n),\ldots,T^{(k)}(n))\pmod 2.
 \]
 
 \item \textbf{Universal instantiation.}
@@ -1055,9 +1055,9 @@ proves the instance
 \]
 \end{enumerate}
 
-\noindent The parity encoding is assumed injective. The counting argument above
-then supplies a vector $x$ of length $L+1$ whose encoding has length at least
-$L+1$.
+\noindent The parity encoding is assumed injective. For $L=\text{length}(p)$,
+the counting argument above then supplies a vector $x$ of length $L+1$ whose
+encoding has length at least $L+1$.
 
 \subsection*{Motivation for the trace-specification assumption}
 
@@ -1122,9 +1122,9 @@ locale Collatz_Trace_Barrier =
   assumes trace_specification:
     "[| proves_reaches_one p n;
         n > 0;
-        Tpow (length p) n > 2 |]
+        Tpow k n > 2 |]
      ==> contains p
-          (enc_parity (parity_vec n (Suc (length p))))"
+          (enc_parity (parity_vec n (Suc k)))"
   (* A proof of the Collatz conjecture proves every positive instance *)
   assumes collatz_proof_instances:
     "is_collatz_proof p ==> ALL n>0. proves_reaches_one p n"
@@ -1141,8 +1141,8 @@ Suppose that $p$ is a proof and let $L=\text{length}(p)$. Choose an
 incompressible vector $x$ of length $L+1$. The preceding realisability result
 supplies a positive $n$ whose first $L+1$ parity values equal $x$ and whose
 parities at steps $L$ and $L+1$ are equal. Hence $T^{(L)}(n)>2$, and if $T^{(k)}(n)=1$, 
-then $k>L$. The trace--specification assumption requires $p$ to contain the encoded vector
-$x$. Its encoding has length at least $L+1$, whereas every substring of $p$
+then $k>L$. Applying the trace--specification assumption at step $L$ requires $p$
+to contain the encoded vector $x$. Its encoding has length at least $L+1$, whereas every substring of $p$
 has length at most $L$. This is the required contradiction.
 \<close>
 
@@ -1175,12 +1175,11 @@ proof -
     using pv_eq by (simp add: L_def)
   have contains_x: "contains p (enc_parity x)"
   proof -
-    have trace_contained:
-      "contains p
-        (enc_parity (parity_vec n (Suc (length p))))"
-      using trace_specification[
-        OF instance_proof n_pos value_at_L_gt_two]
-      by (simp add: L_def)
+  have trace_contained:
+    "contains p
+      (enc_parity (parity_vec n (Suc (length p))))"
+    using trace_specification[
+      OF instance_proof n_pos value_at_L_gt_two] .
     show ?thesis
       using trace_contained pv_eq' by simp
   qed
