@@ -35,10 +35,7 @@ Mathematics and Decision Sciences, Volume 12, Issue 8 (2012), 13--15.
 \noindent The assumptions required for that argument are made explicit and
 formalised within Isabelle/HOL, yielding a machine-checked theorem showing that
 no finite proof can exist within the corresponding class of proof
-systems. These assumptions are motivated by structural properties of the Collatz map, 
-including the realisability of arbitrary parity vectors, the injective dependence 
-of affine parameters on parity traces, and the essential role of parity information 
-in determining the dynamics.
+systems. These assumptions are motivated by structural properties of the Collatz map.
 
 The author of this formalisation received assistance from two AI systems ---
 ChatGPT (OpenAI) and Claude (Anthropic). Their assistance consisted of drafting
