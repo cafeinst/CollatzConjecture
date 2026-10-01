@@ -1048,8 +1048,8 @@ then $p$ contains an encoding of the parity vector
 \]
 
 \item \textbf{Universal instantiation.}
-If $p$ proves the Collatz conjecture, then for every positive $n$ it
-proves the instance
+If $p$ proves the Collatz conjecture, then for every positive $n$ the 
+same certificate \(p\) proves the instance
 \[
 \exists k.\ T^{(k)}(n)=1.
 \]
@@ -1061,57 +1061,53 @@ encoding has length at least $L+1$.
 
 \subsection*{Motivation for the trace-specification assumption}
 
-The trace-specification assumption is motivated by three structural
+The trace-specification assumption is motivated by two structural
 properties of the Collatz map.
 
-\paragraph{1. Realisability of all parity vectors}
-For the Collatz map, every finite bitstring occurs as a parity vector. As a
-result, any proof of universal convergence must account for all possible parity
-patterns; none can be excluded a priori.
-
-By contrast, consider the function
+\paragraph{1. Arbitrarily large excursions.}
+The affine representation
 \[
-T_1(n) =
+T^{(k)}(n)=\frac{3^s n+c}{2^k}
+\]
+allows Collatz iterates to grow arbitrarily large relative to their
+starting values. For example, for every $k \geq 1$, starting at
+$n=2^k-1$ gives $k$ consecutive increasing steps and reaches
+$3^k-1$. The ratio
+\[
+\frac{3^k-1}{2^k-1}
+\]
+grows without bound as $k$ increases.
+
+This contrasts with the map
+\[
+U(n)=
 \begin{cases}
 n/2 & \text{if $n$ is even},\\
-n + 1 & \text{if $n$ is odd}.
+(n+1)/2 & \text{if $n$ is odd}.
 \end{cases}
 \]
-This map is not realisable in the above sense: after an odd step, the next value
-is always even, so the parity pattern $[\text{True},\ \text{True}]$ never
-occurs. Proofs for $T_1$ therefore do not need to consider arbitrary parity
-strings.
+For every $n>1$, we have $1 \leq U(n)<n$, regardless of
+whether $n$ is even or odd. Repeated application therefore
+reaches $1$, without requiring an explicit parity trace.
 
-\paragraph{2. Opposite monotonicity}
-In the Collatz map, even steps decrease the value, while odd steps
-increase it. Consequently, descent of the value at every step
-cannot serve as a convergence argument.
+\paragraph{2. Injectivity of the affine representation.}
+In the Collatz affine representation, $s$ counts the odd steps,
+while $c$ depends on their positions. As shown earlier,
+for a fixed trace length $k$, the correspondence between
+parity vectors and their associated affine parameters
+$(s,c)$ is injective.
 
-By contrast, consider the function
-\[
-T_2(n) =
-\begin{cases}
-n/2 & \text{if $n$ is even},\\
-(n + 1)/2 & \text{if $n$ is odd}.
-\end{cases}
-\]
-Both branches decrease for $n > 1$, so convergence to $1$ follows
-by descent on the positive integers, without needing to specify
-the individual parity choices.
-
-\paragraph{3. Injectivity of the affine formula}
-For the Collatz map, we have the identity
-\[
-T^k(n) = \frac{3^s \cdot n + c}{2^k},
-\]
-where the parameters $(k,s,c)$ are determined by the parity vector.
-As shown earlier, this correspondence is injective, so specifying
-the exact parameters also determines the full parity sequence.
-
-\bigskip\noindent Together, these properties motivate requiring proofs to encode the relevant 
-parity information. This requirement is expressed by the trace-specification assumption 
-below. The final result is conditional on that assumption: the Isabelle development does 
-not derive it from the rules of an arbitrary formal proof system.\<close>
+\bigskip\noindent
+Property 1 motivates the expectation that a proof establishing
+$T^{(k)}(n)=1$ must encode the corresponding affine parameters,
+possibly through an equivalent representation.
+The affine parameters are determined by the parity vector;
+by property 2, this correspondence is reversible.
+The trace-specification assumption requires the proof certificate
+to contain an injective encoding of the required parity prefix
+as a literal substring. The Isabelle development makes the
+consequences of this assumption precise.
+\<close>
 
 locale Collatz_Trace_Barrier =
   fixes enc_parity :: "bool list \<Rightarrow> bitstring"
