@@ -1101,8 +1101,8 @@ $(s,c)$ is injective.
 Property 1 motivates the expectation that a proof establishing
 $T^{(k)}(n)=1$ must encode the corresponding affine parameters,
 possibly through an equivalent representation.
-By property 2, an equivalent representation of the affine
-parameters, for a fixed trace length, is the parity vector.
+By property 2, the parity vector is an equivalent representation
+of the affine parameters for a fixed trace length.
 The trace-specification assumption requires the proof to contain
 the encoded parity trace explicitly. The Isabelle development makes the
 consequences of this assumption precise.
