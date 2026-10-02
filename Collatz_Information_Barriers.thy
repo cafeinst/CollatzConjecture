@@ -195,10 +195,10 @@ T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k}.
 \end{itemize}
 
 \subsection*{Intuition}
-Each odd step multiplies the current value by $3$, adds $1$, and then divides by
-$2$, while each even step simply divides by $2$. After $k$ steps, the cumulative
-effect is multiplication by $3^s$, division by $2^k$, and the addition of an
-accumulated constant $c$.
+Each odd step multiplies the current value by $3$, adds $1$,
+and then divides by $2$, while each even step simply divides
+by $2$. After $k$ steps, the cumulative effect is multiplication
+by $3^s/2^k$ and the addition of $c/2^k$.
 
 \subsection*{Uniqueness}
 The parameters $(k,s,c)$ are uniquely determined by the parity vector. In
@@ -882,9 +882,9 @@ The choice of substring containment is deliberately strong.  It provides a
 simple, syntactic notion of explicit information storage that is easy to reason
 about formally and avoids ambiguity about how information is represented inside
 a proof certificate. In the main barrier theorem, literal containment implies that 
-the encoded parity vector cannot be longer than the proof certificate. The separately
-established incompressibility condition ensures that the chosen vector cannot
-be represented by an encoding shorter than the vector itself.
+the encoded parity vector cannot be longer than the proof certificate. The separately 
+established incompressibility condition ensures that, under the chosen encoding, the 
+encoded vector is at least as long as the vector itself.
 \<close>
 
 definition contains :: "bitstring \<Rightarrow> bitstring \<Rightarrow> bool"
@@ -1052,9 +1052,7 @@ same certificate \(p\) proves the instance
 \]
 \end{enumerate}
 
-\noindent The parity encoding is assumed injective. For $L=\text{length}(p)$,
-the counting argument above then supplies a vector $x$ of length $L+1$ whose
-encoding has length at least $L+1$.
+\noindent The parity encoding is assumed injective.
 
 \subsection*{Motivation for the trace-specification assumption}
 
@@ -1131,13 +1129,15 @@ lemma incompressible_parity_encodings_exist:
 text \<open>
 \subsection*{Interpretation of the main theorem}
 
-Suppose that $p$ is a proof and let $L=\text{length}(p)$. Choose an
-incompressible vector $x$ of length $L+1$. The preceding realisability result
+Suppose that $p$ is a proof of the Collatz conjecture in the
+assumed system, and let $L=\text{length}(p)$. Choose a vector
+$x$ of length $L+1$ that is incompressible under the chosen
+parity encoding. The preceding realisability result
 supplies a positive $n$ whose first $L+1$ parity values equal $x$ and whose
 parities at steps $L$ and $L+1$ are equal. Hence $T^{(L)}(n)>2$, and if $T^{(k)}(n)=1$, 
 then $k>L$. Applying the trace--specification assumption at step $L$ requires $p$
-to contain the encoded vector $x$. Its encoding has length at least $L+1$, whereas every substring of $p$
-has length at most $L$. This is the required contradiction.
+to contain the encoded vector $x$. Its encoding has length at least $L+1$, 
+whereas every substring of $p$ has length at most $L$. This is the required contradiction.
 \<close>
 
 theorem no_finite_collatz_proof:
