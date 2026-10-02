@@ -1095,14 +1095,16 @@ parity vectors and their associated affine parameters
 $(s,c)$ is injective.
 
 \bigskip\noindent
-Property 1 motivates the expectation that a proof establishing
-$T^{(k)}(n)=1$ must encode the corresponding affine parameters,
-possibly through an equivalent representation.
-By property 2, the parity vector is an equivalent representation
-of the affine parameters for a fixed trace length.
-The trace-specification assumption requires the proof to contain
-the encoded parity trace explicitly. The Isabelle development makes the
-consequences of this assumption precise.
+Property 1 rules out the simple step-by-step descent argument
+used for $U$. The affine representation gives the exact formula
+for $T^{(k)}(n)$ associated with its parity vector.
+By property 2, its exact parameters and the parity vector
+determine one another at a fixed trace length.
+We therefore investigate proofs that explicitly store this
+parity information. The trace-specification assumption requires
+the proof certificate to contain the encoded parity trace
+explicitly. The Isabelle development establishes the resulting
+limitation on such certificates.
 \<close>
 
 locale Collatz_Trace_Barrier =
