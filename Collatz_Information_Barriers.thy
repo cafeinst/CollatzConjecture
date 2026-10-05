@@ -6,7 +6,7 @@ text \<open>
 
 \vspace{0.5em}
 
-Formalization in Isabelle/HOL
+Machine-Checked Formalization in Isabelle/HOL
 \end{center}
 
 \subsection*{Abstract}
@@ -17,9 +17,8 @@ to contain arbitrarily large amounts of information about the parity pattern of
 Collatz trajectories, making a finite proof impossible. The present work
 formalises that idea in Isabelle/HOL. Under explicit assumptions about how
 proofs store and preserve information, we prove that no finite proof
-can establish the required convergence property. This yields a
-conditional information-theoretic barrier theorem inspired by the earlier
-argument.
+can establish the required convergence property. This yields a machine-checked 
+conditional information-theoretic barrier theorem inspired by the earlier argument.
 
 \clearpage
 
@@ -33,9 +32,10 @@ Mathematics and Decision Sciences, Volume 12, Issue 8 (2012), 13--15.
 \end{quote}
 
 \noindent The assumptions required for that argument are made explicit and
-formalised within Isabelle/HOL, yielding a conditional theorem showing that
-no finite proof can exist within the corresponding class of proof
-systems. These assumptions are motivated by structural properties of the Collatz map.
+formalised within Isabelle/HOL, yielding a machine-checked
+conditional theorem showing that no finite proof can exist
+within the corresponding class of proof systems. 
+These assumptions are motivated by structural properties of the Collatz map.
 
 The author of this formalisation received assistance from two AI systems ---
 ChatGPT (OpenAI) and Claude (Anthropic). Their assistance consisted of drafting
