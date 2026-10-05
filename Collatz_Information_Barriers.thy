@@ -6,7 +6,7 @@ text \<open>
 
 \vspace{0.5em}
 
-Machine-Checked Formalization in Isabelle/HOL
+Formalization in Isabelle/HOL
 \end{center}
 
 \subsection*{Abstract}
@@ -18,7 +18,7 @@ Collatz trajectories, making a finite proof impossible. The present work
 formalises that idea in Isabelle/HOL. Under explicit assumptions about how
 proofs store and preserve information, we prove that no finite proof
 can establish the required convergence property. This yields a
-machine-checked information-theoretic barrier theorem inspired by the earlier
+conditional information-theoretic barrier theorem inspired by the earlier
 argument.
 
 \clearpage
@@ -33,7 +33,7 @@ Mathematics and Decision Sciences, Volume 12, Issue 8 (2012), 13--15.
 \end{quote}
 
 \noindent The assumptions required for that argument are made explicit and
-formalised within Isabelle/HOL, yielding a machine-checked theorem showing that
+formalised within Isabelle/HOL, yielding a conditional theorem showing that
 no finite proof can exist within the corresponding class of proof
 systems. These assumptions are motivated by structural properties of the Collatz map.
 
@@ -52,21 +52,25 @@ for proof methods that explicitly store the required parity information.
 The argument formalised here isolates the following phenomena:
 
 \begin{enumerate}
-\item If a proposed proof has length $L$, an incompressible parity vector of
-length $L+1$ can be chosen.
-\item The Collatz map realises that vector as the first $L+1$ parities of a
-positive trajectory, while also making the parities at steps $L$ and $L+1$
-equal.
-\item The equality of these two parities implies that the value at step $L$ is
-greater than $2$, and therefore any step at which the trajectory equals $1$
-must occur after step $L$.
-\item Under the trace--specification assumption, the proposed proof must
-contain an encoding of the chosen $L+1$ bits, contradicting its length $L$.
+\item If a proposed universal certificate has length $L$, consider all
+$2^{L+1}$ parity vectors of length $L+1$.
+\item Realise each vector along a positive trajectory with matching
+parities at steps $L$ and $L+1$. This ensures that $T^{(L)}(n)>2$,
+so the trajectory has not yet reached $1$.
+\item Universal instantiation and soundness guarantee that each such
+trajectory eventually reaches $1$. Its first-arrival trace therefore
+extends the prescribed prefix.
+\item Distinct prefixes give distinct completed traces. Trace specification
+requires the certificate to contain their encodings, which are distinct
+by injectivity and have length at most $L$ by substring containment.
+\item There are only $2^{L+1}-1$ bitstrings of length at most $L$.
+They cannot accommodate $2^{L+1}$ distinct encodings.
 \end{enumerate}
 
-\noindent The structure of the argument is inspired by Chaitin--style incompressibility
-methods, but is applied to the representation of computational traces within
-proof certificates rather than to the computation of specific strings.
+\noindent This is an information-theoretic pigeonhole argument, using
+counting of the kind underlying incompressibility methods. It counts
+encodings of completed traces directly; it does not require the encoding
+of a prefix to occur inside the encoding of a longer trace.
 
 \subsection*{Structure of the formalisation}
 
@@ -863,6 +867,38 @@ proof (rule ccontr)
   ultimately show False by simp
 qed
 
+section \<open>First arrival and parity prefixes\<close>
+
+lemma first_hit_exists:
+  assumes n_pos: "n > 0"
+    and reaches: "\<exists>r. Tpow r n = 1"
+  shows "\<exists>r. Tpow r n = 1 \<and> (\<forall>j<r. Tpow j n > 1)"
+proof -
+  let ?r = "LEAST r. Tpow r n = 1"
+  have hit: "Tpow ?r n = 1"
+    by (rule LeastI_ex[OF reaches])
+  have before: "\<forall>j<?r. Tpow j n > 1"
+  proof (intro allI impI)
+    fix j
+    assume j_lt: "j < ?r"
+    have not_one: "Tpow j n \<noteq> 1"
+    proof
+      assume "Tpow j n = 1"
+      then have "?r \<le> j" by (rule Least_le)
+      with j_lt show False by simp
+    qed
+    have "Tpow j n > 0"
+      by (rule Tpow_positive[OF n_pos])
+    with not_one show "Tpow j n > 1" by linarith
+  qed
+  show ?thesis using hit before by blast
+qed
+
+lemma parity_vec_take_prefix:
+  assumes "m \<le> r"
+  shows "take m (parity_vec n r) = parity_vec n m"
+  using assms by (simp add: parity_vec_def take_map)
+
 section \<open>Proof system setup\<close>
 
 type_synonym bit = bool
@@ -882,9 +918,10 @@ The choice of substring containment is deliberately strong.  It provides a
 simple, syntactic notion of explicit information storage that is easy to reason
 about formally and avoids ambiguity about how information is represented inside
 a proof certificate. In the main barrier theorem, literal containment implies that 
-the encoded parity vector cannot be longer than the proof certificate. The separately 
-established incompressibility condition ensures that, under the chosen encoding, the 
-encoded vector is at least as long as the vector itself.
+the encoded first-arrival trace cannot be longer than the proof certificate.
+Injectivity makes the encodings of distinct completed traces distinct.
+The main theorem counts these encodings directly; it does not assume that
+an encoding preserves the prefix relation.
 \<close>
 
 definition contains :: "bitstring \<Rightarrow> bitstring \<Rightarrow> bool"
@@ -980,7 +1017,12 @@ text \<open>
 \subsection*{The pigeonhole argument}
 
 \paragraph{Theorem.}
-For any injective encoding, there exists an incompressible bitstring.
+For any injective encoding, there exists an incompressible bitstring
+of every prescribed length.
+
+The following theorem records the general incompressibility principle.
+The final barrier proof uses the underlying cardinality bounds directly
+on completed first-arrival traces.
 \<close>
 
 theorem incompressible_strings_exist_for_enc:
@@ -1034,21 +1076,31 @@ A bitstring $p$ represents a proposed proof.
 
 \begin{enumerate}
 \item \textbf{Trace specification.}
-For any natural number $k$, if $p$ proves that a particular positive $n$
-reaches $1$, and
+If $p$ proves that a positive integer $n$ reaches $1$, and $r$
+is the first step at which it does so, then $p$ contains an
+encoding of the parity trace leading to that first arrival.
+Explicitly, if
 \[
-T^{(k)}(n)>2,
+T^{(r)}(n)=1
+\quad\text{and}\quad
+T^{(j)}(n)>1 \text{ for every }j<r,
 \]
-then $p$ contains an encoding of the parity vector
+then $p$ contains an encoding of
 \[
-(n,T(n),\ldots,T^{(k)}(n))\pmod 2.
+(n,T(n),\ldots,T^{(r-1)}(n))\pmod 2.
 \]
+For $r=0$, this trace is empty. Only the completed first-arrival
+trace is required; its earlier prefixes need not be encoded separately.
+
+\item \textbf{Soundness for individual instances.}
+If $p$ proves that a positive integer $n$ reaches $1$,
+then there exists an $r$ such that $T^{(r)}(n)=1$.
 
 \item \textbf{Universal instantiation.}
-If $p$ proves the Collatz conjecture, then for every positive $n$ the 
-same certificate \(p\) proves the instance
+If $p$ proves the Collatz conjecture, then for every positive $n$
+the same certificate $p$ proves the instance
 \[
-\exists k.\ T^{(k)}(n)=1.
+\exists r.\ T^{(r)}(n)=1.
 \]
 \end{enumerate}
 
@@ -1101,8 +1153,8 @@ determine one another at a fixed trace length.
 We therefore investigate proofs that explicitly store this
 parity information. The trace-specification assumption requires
 the proof certificate to contain the encoded parity trace
-explicitly. The Isabelle development establishes the resulting
-limitation on such certificates.
+leading to the first arrival at $1$ explicitly. The Isabelle development
+establishes the resulting limitation on such certificates.
 \<close>
 
 locale Collatz_Trace_Barrier =
@@ -1110,88 +1162,153 @@ locale Collatz_Trace_Barrier =
     and proves_reaches_one :: "bitstring \<Rightarrow> nat \<Rightarrow> bool"
     and is_collatz_proof :: "bitstring \<Rightarrow> bool"
   assumes enc_parity_injective: "inj enc_parity"
-  (* The required parity prefix must be specified *)
-  assumes trace_specification:
-    "[| proves_reaches_one p n;
-        n > 0;
-        Tpow k n > 2 |]
-     ==> contains p
-          (enc_parity (parity_vec n (Suc k)))"
-  (* A proof of the Collatz conjecture proves every positive instance *)
+  assumes instance_soundness:
+    "\<lbrakk>proves_reaches_one p n; n > 0\<rbrakk>
+     \<Longrightarrow> \<exists>r. Tpow r n = 1"
+  assumes first_hit_trace_specification:
+    "\<lbrakk>proves_reaches_one p n;
+      n > 0;
+      Tpow r n = 1;
+      \<forall>j<r. Tpow j n > 1\<rbrakk>
+     \<Longrightarrow> contains p (enc_parity (parity_vec n r))"
   assumes collatz_proof_instances:
-    "is_collatz_proof p ==> ALL n>0. proves_reaches_one p n"
+    "is_collatz_proof p \<Longrightarrow>
+       \<forall>n>0. proves_reaches_one p n"
 begin
 
-lemma incompressible_parity_encodings_exist:
-  shows "\<exists>s. length s = m \<and> incompressible_by s enc_parity"
-  using incompressible_strings_exist_for_enc[OF enc_parity_injective] .
+text \<open>
+Every prescribed prefix of length $L+1$ can be extended to a stored
+first-arrival trace, if a universal certificate exists. The matching-parity
+construction ensures that the trajectory has not reached $1$ during the
+prescribed prefix. Soundness supplies a later first arrival.
+\<close>
+
+lemma stored_first_hit_extension:
+  assumes p_proof: "is_collatz_proof p"
+    and x_len: "length x = Suc L"
+  shows "\<exists>y. take (Suc L) y = x \<and> contains p (enc_parity y)"
+proof -
+  obtain n where
+    n_pos: "n > 0" and
+    prefix: "parity_vec n (Suc L) = x" and
+    matching: "odd (Tpow (Suc L) n) = odd (Tpow L n)"
+    using parity_vector_realizable_with_matching_next_parity[OF x_len]
+    by blast
+  have instance_proof: "proves_reaches_one p n"
+    using collatz_proof_instances[OF p_proof] n_pos by blast
+  have reaches: "\<exists>r. Tpow r n = 1"
+    by (rule instance_soundness[OF instance_proof n_pos])
+  obtain r where
+    hit: "Tpow r n = 1" and
+    before: "\<forall>j<r. Tpow j n > 1"
+    using first_hit_exists[OF n_pos reaches] by blast
+  have r_gt: "r > L"
+    by (rule reaches_one_only_after_L[OF n_pos matching hit])
+  have prefix_length: "Suc L \<le> r" using r_gt by simp
+  have extends: "take (Suc L) (parity_vec n r) = x"
+    using parity_vec_take_prefix[OF prefix_length, of n] prefix by simp
+  have stored: "contains p (enc_parity (parity_vec n r))"
+    by (rule first_hit_trace_specification
+        [OF instance_proof n_pos hit before])
+  show ?thesis using extends stored by blast
+qed
 
 text \<open>
 \subsection*{Interpretation of the main theorem}
 
-Suppose that $p$ is a proof of the Collatz conjecture in the
-assumed system, and let $L=\text{length}(p)$. Choose a vector
-$x$ of length $L+1$ that is incompressible under the chosen
-parity encoding. The preceding realisability result
-supplies a positive $n$ whose first $L+1$ parity values equal $x$ and whose
-parities at steps $L$ and $L+1$ are equal. Hence $T^{(L)}(n)>2$, and if $T^{(k)}(n)=1$, 
-then $k>L$. Applying the trace--specification assumption at step $L$ requires $p$
-to contain the encoded vector $x$. Its encoding has length at least $L+1$, 
-whereas every substring of $p$ has length at most $L$. This is the required contradiction.
+Let $L$ be the length of a proposed universal certificate. There are
+$2^{L+1}$ prefixes of length $L+1$. Choose a stored first-arrival trace
+extending each prefix. Distinct prefixes give distinct completed traces,
+and injectivity gives distinct encodings. Every encoding must have length
+at most $L$ because it occurs inside the certificate. But there are only
+$2^{L+1}-1$ bitstrings of length at most $L$, giving a contradiction.
+
+This counts encodings of completed traces directly. No compatibility
+between the encodings of a trace and its prefixes is required.
 \<close>
 
 theorem no_finite_collatz_proof:
   assumes p_proof: "is_collatz_proof p"
   shows False
 proof -
-  define L where "L = length p"
-  obtain x where
-    x_len: "length x = Suc L" and
-    x_incomp: "incompressible_by x enc_parity"
-    using incompressible_parity_encodings_exist[of "Suc L"]
-    by blast
-  obtain n where
-    n_pos: "n > 0" and
-    pv_eq: "parity_vec n (Suc L) = x" and
-    same_parity:
-      "odd (Tpow (Suc L) n) = odd (Tpow L n)"
-    using parity_vector_realizable_with_matching_next_parity[OF x_len]
-    by blast
-  have value_at_L_gt_two:
-    "Tpow (length p) n > 2"
-    using equal_successive_parity_imp_gt_two[OF n_pos same_parity]
-    by (simp add: L_def)
-  have instance_proof: "proves_reaches_one p n"
-    using collatz_proof_instances[OF p_proof] n_pos
-    by blast
-  have pv_eq':
-    "parity_vec n (Suc (length p)) = x"
-    using pv_eq by (simp add: L_def)
-  have contains_x: "contains p (enc_parity x)"
+  let ?L = "length p"
+  let ?S = "{x::bitstring. length x = Suc ?L}"
+  let ?B = "{z::bitstring. length z \<le> ?L}"
+
+  define f :: "bitstring \<Rightarrow> bitstring" where
+    "f x = (SOME y. take (Suc ?L) y = x \<and>
+                       contains p (enc_parity y))" for x
+
+  have f_properties:
+    "take (Suc ?L) (f x) = x \<and> contains p (enc_parity (f x))"
+    if x_in: "x \<in> ?S" for x
   proof -
-  have trace_contained:
-    "contains p
-      (enc_parity (parity_vec n (Suc (length p))))"
-    using trace_specification[
-      OF instance_proof n_pos value_at_L_gt_two] .
+    have x_len: "length x = Suc ?L" using x_in by simp
+    have exists_extension:
+      "\<exists>y. take (Suc ?L) y = x \<and> contains p (enc_parity y)"
+      by (rule stored_first_hit_extension[OF p_proof x_len])
     show ?thesis
-      using trace_contained pv_eq' by simp
+      unfolding f_def by (rule someI_ex[OF exists_extension])
   qed
-  have enc_large: "Suc L \<le> length (enc_parity x)"
-    using x_incomp x_len
-    by (simp add: incompressible_by_def compressible_def)
-  have enc_fits: "length (enc_parity x) \<le> length p"
-    using contains_len_bound[OF contains_x] .
-  have "Suc L <= length p"
-    using enc_large enc_fits by linarith
-  then show False
-    by (simp add: L_def)
+
+  have enc_f_inj: "inj_on (\<lambda>x. enc_parity (f x)) ?S"
+  proof (rule inj_onI)
+    fix x y
+    assume x_in: "x \<in> ?S" and y_in: "y \<in> ?S"
+      and equal_enc: "enc_parity (f x) = enc_parity (f y)"
+    have equal_traces: "f x = f y"
+      using enc_parity_injective equal_enc by (rule injD)
+    have x_prefix: "take (Suc ?L) (f x) = x"
+      using f_properties[OF x_in] by blast
+    have y_prefix: "take (Suc ?L) (f y) = y"
+      using f_properties[OF y_in] by blast
+    show "x = y" using equal_traces x_prefix y_prefix by metis
+  qed
+
+  have encodings_fit:
+    "(\<lambda>x. enc_parity (f x)) ` ?S \<subseteq> ?B"
+  proof
+    fix z
+    assume "z \<in> (\<lambda>x. enc_parity (f x)) ` ?S"
+    then obtain x where x_in: "x \<in> ?S"
+      and z_eq: "z = enc_parity (f x)" by blast
+    have stored: "contains p (enc_parity (f x))"
+      using f_properties[OF x_in] by blast
+    have "length (enc_parity (f x)) \<le> length p"
+      by (rule contains_len_bound[OF stored])
+    then show "z \<in> ?B" by (simp add: z_eq)
+  qed
+
+  have finite_B: "finite ?B"
+    by (rule finite_bitstrings_le_len)
+  have image_bound:
+    "card ((\<lambda>x. enc_parity (f x)) ` ?S) \<le> card ?B"
+    by (rule card_mono[OF finite_B encodings_fit])
+  have image_card:
+    "card ((\<lambda>x. enc_parity (f x)) ` ?S) = card ?S"
+    by (rule card_image[OF enc_f_inj])
+  have source_card: "card ?S = 2 ^ Suc ?L"
+    by (rule many_strings_of_length)
+  have target_card: "card ?B = 2 ^ Suc ?L - 1"
+  proof -
+    have "card ?B = sum (\<lambda>i. (2::nat)^i) {..?L}"
+      by (rule card_bitstrings_le_len)
+    also have "... = sum (\<lambda>i. (2::nat)^i) {..<Suc ?L}"
+      by (simp only: lessThan_Suc_atMost)
+    also have "... = 2 ^ Suc ?L - 1"
+      by (rule sum_pow2_lt)
+    finally show ?thesis .
+  qed
+  have impossible: "(2::nat) ^ Suc ?L \<le> 2 ^ Suc ?L - 1"
+    using image_bound
+    by (simp only: image_card source_card target_card)
+  have positive: "(2::nat) ^ Suc ?L > 0" by simp
+  show False using impossible positive by linarith
 qed
 
 corollary no_collatz_proof_in_this_system:
-  shows "\<not> (\<exists>p. is_collatz_proof p)"
-  using no_finite_collatz_proof
-  by blast
+  "\<not> (\<exists>p. is_collatz_proof p)"
+  using no_finite_collatz_proof by blast
 
-end (* End of locale *)
-end (* End of theory *)
+end
+end
