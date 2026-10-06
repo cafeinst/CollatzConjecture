@@ -895,15 +895,12 @@ contiguous substring of $p$, i.e.\ if there exist bitstrings $u$ and $v$ such
 that $p = u @ s @ v$.
 
 \paragraph{Remark.}
-The choice of substring containment is deliberately strong.  It provides a
-simple, syntactic notion of explicit information storage that is easy to reason
-about formally and avoids ambiguity about how information is represented inside
-a proof certificate. In the main barrier theorem, literal containment implies that 
-the encoded first-arrival trace cannot be longer than the proof certificate.
-Injectivity makes the encodings of distinct completed traces distinct.
-The main theorem counts these encodings directly; it does not assume that
-an encoding preserves the prefix relation.
-\<close>
+Substring containment gives a precise model of explicit trace storage:
+the proof must contain the encoding as literal data, so the encoding
+cannot be longer than the proof. Different parity traces have different
+encodings by injectivity. The main theorem counts these encodings
+directly, without requiring the encoding of a prefix to be a prefix
+of the encoding of the full trace.\<close>
 
 definition contains :: "bitstring \<Rightarrow> bitstring \<Rightarrow> bool"
   where "contains p s \<longleftrightarrow> (\<exists>u v. p = u @ s @ v)"
@@ -1015,8 +1012,7 @@ then $p$ contains an encoding of
 \[
 (n,T(n),\ldots,T^{(r-1)}(n))\pmod 2.
 \]
-For $r=0$, this trace is empty. Only the completed first-arrival
-trace is required; its earlier prefixes need not be encoded separately.
+For $r=0$, this trace is empty.
 
 \item \textbf{Injectivity of the parity encoding.}
 Different parity traces have different encodings.
