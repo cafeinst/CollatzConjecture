@@ -12,13 +12,13 @@ Machine-Checked Formalization in Isabelle/HOL
 \subsection*{Abstract}
 
 In an earlier paper, \emph{The Collatz $3n+1$ Conjecture is Unprovable}
-(2012), the author argued that any proof of the Collatz conjecture would need
+(2012), the author argued that any proof of the Collatz Conjecture would need
 to contain arbitrarily large amounts of information about the parity pattern of
 Collatz trajectories, making a finite proof impossible. The present work
 formalises that idea in Isabelle/HOL. Under explicit assumptions about how
 proofs store and preserve information, we prove that no finite proof
 can establish the required convergence property. This yields a machine-checked 
-conditional information-theoretic barrier theorem inspired by the earlier argument.
+information-theoretic barrier theorem inspired by the earlier argument.
 
 \clearpage
 
@@ -49,28 +49,23 @@ for proof methods that explicitly store the required parity information.
 
 \subsection*{High-level strategy}
 
-The argument formalised here isolates the following phenomena:
+Suppose a finite certificate of length $L$ proves the Collatz
+conjecture. There are $2^{L+1}$ possible lists of $L+1$
+parity bits. For each list, we can choose a positive starting
+value whose trajectory has exactly those first $L+1$ parity
+bits and has not reached $1$ by step $L$. The certificate proves 
+convergence for every chosen starting value. By soundness, each 
+trajectory therefore reaches $1$ at some later step. The completed 
+parity trace begins with the chosen list.
 
-\begin{enumerate}
-\item If a proposed universal certificate has length $L$, consider all
-$2^{L+1}$ parity vectors of length $L+1$.
-\item Realise each vector along a positive trajectory with matching
-parities at steps $L$ and $L+1$. This ensures that $T^{(L)}(n)>2$,
-so the trajectory has not yet reached $1$.
-\item Universal instantiation and soundness guarantee that each such
-trajectory eventually reaches $1$. Its first-arrival trace therefore
-extends the prescribed prefix.
-\item Distinct prefixes give distinct completed traces. Trace specification
-requires the certificate to contain their encodings, which are distinct
-by injectivity and have length at most $L$ by substring containment.
-\item There are only $2^{L+1}-1$ bitstrings of length at most $L$.
-They cannot accommodate $2^{L+1}$ distinct encodings.
-\end{enumerate}
-
-\noindent This is an information-theoretic pigeonhole argument, using
-counting of the kind underlying incompressibility methods. It counts
-encodings of completed traces directly; it does not require the encoding
-of a prefix to occur inside the encoding of a longer trace.
+These completed traces are distinct because their initial
+patterns differ. Injectivity therefore gives $2^{L+1}$
+distinct encodings, all of which must occur inside the same
+certificate by trace specification. Each encoding must have
+length at most $L$, but there are only $2^{L+1}-1$ binary
+strings of that length or shorter. This contradiction rules
+out a finite universal certificate satisfying the stated
+assumptions.
 
 \subsection*{Structure of the formalisation}
 
@@ -82,7 +77,7 @@ computational traces of the iterative process.
 
 \item[2. Affine formula characterisation]
 We show that $T^{(k)}(n)$ admits an affine representation
-$(3^s \cdot n + c) / 2^k$, and prove that the parameters $(k,s,c)$ are uniquely
+$(3^s n + c) / 2^k$, and prove that the parameters $(k,s,c)$ are uniquely
 determined by the parity vector.
 
 \item[3. Two--adic invariance]
@@ -187,7 +182,7 @@ text \<open>
 After $k$ iterations of the Collatz map $T$, the result admits an affine
 representation:
 \[
-T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k}.
+T^{(k)}(n) = \frac{3^s n + c}{2^k}.
 \]
 
 \noindent Here:
@@ -869,6 +864,27 @@ qed
 
 section \<open>First arrival and parity prefixes\<close>
 
+text \<open>
+The following two lemmas connect an initial parity pattern
+with the complete trace leading to the first arrival at $1$.
+
+First, if a positive trajectory reaches $1$, there is an
+earliest step $r$ at which it does so. Every value before
+that step is greater than $1$. This establishes the
+first-arrival condition used in the trace-specification
+assumption.
+
+Second, recording more steps does not change the parity
+bits already recorded. For $m \le r$, the first $m$ bits
+of the length-$r$ parity trace are exactly the length-$m$
+parity trace.
+
+If two trajectories have different initial parity patterns
+of the same length, their complete traces to the first
+arrival at $1$ are also different, provided both traces
+include those initial patterns.
+\<close>
+
 lemma first_hit_exists:
   assumes n_pos: "n > 0"
     and reaches: "\<exists>r. Tpow r n = 1"
@@ -1092,6 +1108,9 @@ then $p$ contains an encoding of
 For $r=0$, this trace is empty. Only the completed first-arrival
 trace is required; its earlier prefixes need not be encoded separately.
 
+\item \textbf{Injectivity of the parity encoding.}
+Different parity traces have different encodings.
+
 \item \textbf{Soundness for individual instances.}
 If $p$ proves that a positive integer $n$ reaches $1$,
 then there exists an $r$ such that $T^{(r)}(n)=1$.
@@ -1103,8 +1122,6 @@ the same certificate $p$ proves the instance
 \exists r.\ T^{(r)}(n)=1.
 \]
 \end{enumerate}
-
-\noindent The parity encoding is assumed injective.
 
 \subsection*{Motivation for the trace-specification assumption}
 
@@ -1177,10 +1194,12 @@ locale Collatz_Trace_Barrier =
 begin
 
 text \<open>
-Every prescribed prefix of length $L+1$ can be extended to a stored
-first-arrival trace, if a universal certificate exists. The matching-parity
-construction ensures that the trajectory has not reached $1$ during the
-prescribed prefix. Soundness supplies a later first arrival.
+\noindent If a universal certificate exists, then every chosen parity
+pattern of length $L+1$ can be realised by a positive trajectory
+that has not reached $1$ by step $L$. Universal instantiation
+and soundness guarantee that it reaches $1$ later.
+Trace specification then requires the certificate to contain
+an encoding of the complete parity trace leading to that first arrival.
 \<close>
 
 lemma stored_first_hit_extension:
@@ -1217,14 +1236,13 @@ text \<open>
 \subsection*{Interpretation of the main theorem}
 
 Let $L$ be the length of a proposed universal certificate. There are
-$2^{L+1}$ prefixes of length $L+1$. Choose a stored first-arrival trace
-extending each prefix. Distinct prefixes give distinct completed traces,
+$2^{L+1}$ prefixes of length $L+1$. For each prefix, choose a complete 
+parity trace that begins with that prefix and leads to the first arrival at $1$.
+The preceding lemma guarantees that its encoding occurs
+in the certificate. Distinct prefixes give distinct completed traces,
 and injectivity gives distinct encodings. Every encoding must have length
 at most $L$ because it occurs inside the certificate. But there are only
 $2^{L+1}-1$ bitstrings of length at most $L$, giving a contradiction.
-
-This counts encodings of completed traces directly. No compatibility
-between the encodings of a trace and its prefixes is required.
 \<close>
 
 theorem no_finite_collatz_proof:
