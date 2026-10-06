@@ -15,9 +15,9 @@ In an earlier paper, \emph{The Collatz $3n+1$ Conjecture is Unprovable}
 (2012), the author argued that any proof of the Collatz Conjecture would need
 to contain arbitrarily large amounts of information about the parity pattern of
 Collatz trajectories, making a finite proof impossible. The present work
-formalises that idea in Isabelle/HOL. Under explicit assumptions about how
-proofs store and preserve information, we prove that no finite proof
-can establish the required convergence property. This yields a machine-checked 
+formalises that idea in Isabelle/HOL. Under explicit assumptions about how 
+proofs store parity information, we prove that no finite proof satisfying those 
+assumptions can establish universal Collatz convergence. This yields a machine-checked 
 information-theoretic barrier theorem inspired by the earlier argument.
 
 \clearpage
@@ -64,9 +64,9 @@ We define the Collatz function $T$ and formalise parity vectors as
 computational traces of the iterative process.
 
 \item[2. Affine formula characterisation]
-We show that $T^{(k)}(n)$ admits an affine representation
-$(3^s n + c) / 2^k$, and prove that the parameters $(k,s,c)$ are uniquely
-determined by the parity vector.
+We establish the affine representation $(3^s n+c)/2^k$ and
+prove that, for fixed $k$, its parameters uniquely determine
+the parity vector.
 
 \item[3. Two--adic invariance]
 We establish a key invariance property: adding $2^k$ to a starting value does
@@ -79,8 +79,8 @@ starting value. This shows that arbitrarily complex computational traces are
 inherent to the Collatz dynamics.
 
 \item[5. Proof system setup]
-We introduce an abstract model of proof certificates based on bitstrings,
-substring containment, and information--theoretic compressibility.
+We model proofs as bitstrings and state assumptions about
+soundness, parity encoding, and explicit trace storage.
 
 \item[6. The original information--barrier argument]
 We formalise the original information--theoretic argument for the
@@ -116,8 +116,7 @@ abbreviation Tpow :: "nat \<Rightarrow> nat \<Rightarrow> nat"
 text \<open>
 \subsection*{The Collatz conjecture}
 
-The formulation of the conjecture used in the earlier paper, and throughout 
-this development, is:
+The Collatz conjecture states:
 \[
 \forall n>0.\ \exists k.\ T^{(k)}(n) = 1.
 \]
@@ -186,11 +185,6 @@ Each odd step multiplies the current value by $3$, adds $1$,
 and then divides by $2$, while each even step simply divides
 by $2$. After $k$ steps, the cumulative effect is multiplication
 by $3^s/2^k$ and the addition of $c/2^k$.
-
-\subsection*{Uniqueness}
-The parameters $(k,s,c)$ are uniquely determined by the parity vector. In
-particular, the parity vector encodes all computational information needed to
-reconstruct the affine formula for $T^{(k)}(n)$.
 \<close>
 
 fun params0 :: "bool list \<Rightarrow> nat \<times> nat" where
@@ -468,9 +462,7 @@ sequence agrees with $x$:
 \forall x.\ \exists n.\ \textit{parity\_vec}\ n\ (\text{length } x) = x.
 \]
 
-\noindent This means that every possible computational trace of the Collatz map actually
-occurs for some starting number. In particular, parity traces of arbitrary
-length, including incompressible traces, are realised.
+\noindent Thus, every finite parity pattern occurs for some starting value. 
 \<close>
 
 text \<open>
@@ -960,12 +952,7 @@ next
         mult_2 nat.discI plus_1_eq_Suc power_Suc0_right power_add 
         power_eq_0_iff zero_less_one)
 qed
-(* Incompressibility definitions *)
-definition compressible :: "bitstring \<Rightarrow> (bitstring \<Rightarrow> bitstring) \<Rightarrow> bool" where
-  "compressible s enc \<equiv> length (enc s) < length s"
 
-definition incompressible_by :: "bitstring \<Rightarrow> (bitstring \<Rightarrow> bitstring) \<Rightarrow> bool" where
-  "incompressible_by s enc \<equiv> \<not>compressible s enc"
 (* Sum of geometric series: 2^0 + 2^1 + ... + 2^(m-1) = 2^m - 1 *)
 lemma sum_pow2_lt: "sum (%i. (2::nat) ^ i) {..<m} = 2 ^ m - 1"
   by (induction m) simp_all
@@ -1000,57 +987,6 @@ proof -
     by (simp add: many_strings_of_length)
   finally show ?thesis
     by (simp add: union_eq)
-qed
-
-text \<open>
-\subsection*{The pigeonhole argument}
-
-\paragraph{Theorem.}
-For any injective encoding, there exists an incompressible bitstring
-of every prescribed length.
-\<close>
-
-theorem incompressible_strings_exist_for_enc:
-  fixes enc :: "bitstring \<Rightarrow> bitstring"
-  assumes "inj enc"
-  shows "\<exists>s. length s = m \<and> incompressible_by s enc"
-proof (cases m)
-  case 0
-  have "length ([]::bitstring) = 0 \<and> 0 \<le> length (enc [])"
-    by simp
-  then show ?thesis using 0 incompressible_by_def compressible_def by auto
-next
-  case (Suc r)
-  let ?S = "{t::bitstring. length t = Suc r}"
-  let ?T = "{u::bitstring. length u \<le> r}"
-  have finS: "finite ?S" by (simp add: finite_bitstrings_of_len)
-  have finT: "finite ?T" by (simp add: finite_bitstrings_le_len)
-  have Sm: "card ?S = 2 ^ Suc r"
-    by (simp add: many_strings_of_length)
-  have Tm: "card ?T = sum (%i. (2::nat) ^ i) {..r}"
-    by (simp add: card_bitstrings_le_len)
-  also have "... = sum (%i. (2::nat) ^ i) {..<Suc r}"
-    by (simp add: lessThan_Suc_atMost)
-  finally have Tm': "card ?T = sum (%i. (2::nat) ^ i) {..<Suc r}" .
-  from Tm' have lt: "card ?T = 2 ^ Suc r - 1"
-    by (simp add: sum_pow2_lt)
-  from Sm lt have card_less: "card ?T < card ?S" by simp
-  have not_all_shrink: "~(ALL t:?S. length (enc t) <= r)"
-  proof
-    assume H: "ALL t:?S. length (enc t) <= r"
-    have "enc ` ?S <= ?T" using H by auto
-    hence "card (enc ` ?S) <= card ?T"
-      using finT card_mono by blast
-    moreover from assms finS have "card (enc ` ?S) = card ?S"
-      using card_image by (metis subset_UNIV subset_inj_on)
-    ultimately show False using card_less by linarith
-  qed
-  then obtain t where tS: "t : ?S" and len: "~ length (enc t) <= r" 
-    by blast 
-  hence "length (enc t) \<ge> Suc r" by simp
-  moreover from tS have "length t = Suc r" by auto
-  ultimately show ?thesis 
-    using Suc incompressible_by_def compressible_def by auto
 qed
 
 text \<open>
