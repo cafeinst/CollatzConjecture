@@ -49,23 +49,11 @@ for proof methods that explicitly store the required parity information.
 
 \subsection*{High-level strategy}
 
-Suppose a finite certificate of length $L$ proves the Collatz
-conjecture. There are $2^{L+1}$ possible lists of $L+1$
-parity bits. For each list, we can choose a positive starting
-value whose trajectory has exactly those first $L+1$ parity
-bits and has not reached $1$ by step $L$. The certificate proves 
-convergence for every chosen starting value. By soundness, each 
-trajectory therefore reaches $1$ at some later step. The completed 
-parity trace begins with the chosen list.
-
-These completed traces are distinct because their initial
-patterns differ. Injectivity therefore gives $2^{L+1}$
-distinct encodings, all of which must occur inside the same
-certificate by trace specification. Each encoding must have
-length at most $L$, but there are only $2^{L+1}-1$ binary
-strings of that length or shorter. This contradiction rules
-out a finite universal certificate satisfying the stated
-assumptions.
+Suppose a finite proof establishes the Collatz conjecture.
+A counting argument shows that some trajectory's parity trace
+up to its first arrival at $1$ has an encoding longer than
+the proof. Trace specification requires the proof to contain
+that encoding, which is impossible.
 
 \subsection*{Structure of the formalisation}
 
@@ -865,24 +853,9 @@ qed
 section \<open>First arrival and parity prefixes\<close>
 
 text \<open>
-The following two lemmas connect an initial parity pattern
-with the complete trace leading to the first arrival at $1$.
-
-First, if a positive trajectory reaches $1$, there is an
-earliest step $r$ at which it does so. Every value before
-that step is greater than $1$. This establishes the
-first-arrival condition used in the trace-specification
-assumption.
-
-Second, recording more steps does not change the parity
-bits already recorded. For $m \le r$, the first $m$ bits
-of the length-$r$ parity trace are exactly the length-$m$
-parity trace.
-
-If two trajectories have different initial parity patterns
-of the same length, their complete traces to the first
-arrival at $1$ are also different, provided both traces
-include those initial patterns.
+The following lemmas identify the earliest step at which a trajectory
+reaches $1$ and show that longer parity traces retain their initial
+bits, as needed in the main proof.
 \<close>
 
 lemma first_hit_exists:
@@ -1035,10 +1008,6 @@ text \<open>
 \paragraph{Theorem.}
 For any injective encoding, there exists an incompressible bitstring
 of every prescribed length.
-
-The following theorem records the general incompressibility principle.
-The final barrier proof uses the underlying cardinality bounds directly
-on completed first-arrival traces.
 \<close>
 
 theorem incompressible_strings_exist_for_enc:
@@ -1091,6 +1060,11 @@ This locale states the information assumptions used in the argument.
 A bitstring $p$ represents a proposed proof.
 
 \begin{enumerate}
+
+\item \textbf{Soundness for individual instances.}
+If $p$ proves that a positive integer $n$ reaches $1$,
+then there exists an $r$ such that $T^{(r)}(n)=1$.
+
 \item \textbf{Trace specification.}
 If $p$ proves that a positive integer $n$ reaches $1$, and $r$
 is the first step at which it does so, then $p$ contains an
@@ -1110,10 +1084,6 @@ trace is required; its earlier prefixes need not be encoded separately.
 
 \item \textbf{Injectivity of the parity encoding.}
 Different parity traces have different encodings.
-
-\item \textbf{Soundness for individual instances.}
-If $p$ proves that a positive integer $n$ reaches $1$,
-then there exists an $r$ such that $T^{(r)}(n)=1$.
 
 \item \textbf{Universal instantiation.}
 If $p$ proves the Collatz conjecture, then for every positive $n$
@@ -1178,29 +1148,20 @@ locale Collatz_Trace_Barrier =
   fixes enc_parity :: "bool list \<Rightarrow> bitstring"
     and proves_reaches_one :: "bitstring \<Rightarrow> nat \<Rightarrow> bool"
     and is_collatz_proof :: "bitstring \<Rightarrow> bool"
-  assumes enc_parity_injective: "inj enc_parity"
   assumes instance_soundness:
     "\<lbrakk>proves_reaches_one p n; n > 0\<rbrakk>
      \<Longrightarrow> \<exists>r. Tpow r n = 1"
-  assumes first_hit_trace_specification:
+  assumes trace_specification:
     "\<lbrakk>proves_reaches_one p n;
       n > 0;
       Tpow r n = 1;
       \<forall>j<r. Tpow j n > 1\<rbrakk>
      \<Longrightarrow> contains p (enc_parity (parity_vec n r))"
+  assumes enc_parity_injective: "inj enc_parity"   
   assumes collatz_proof_instances:
     "is_collatz_proof p \<Longrightarrow>
        \<forall>n>0. proves_reaches_one p n"
 begin
-
-text \<open>
-\noindent If a universal certificate exists, then every chosen parity
-pattern of length $L+1$ can be realised by a positive trajectory
-that has not reached $1$ by step $L$. Universal instantiation
-and soundness guarantee that it reaches $1$ later.
-Trace specification then requires the certificate to contain
-an encoding of the complete parity trace leading to that first arrival.
-\<close>
 
 lemma stored_first_hit_extension:
   assumes p_proof: "is_collatz_proof p"
@@ -1227,7 +1188,7 @@ proof -
   have extends: "take (Suc L) (parity_vec n r) = x"
     using parity_vec_take_prefix[OF prefix_length, of n] prefix by simp
   have stored: "contains p (enc_parity (parity_vec n r))"
-    by (rule first_hit_trace_specification
+    by (rule trace_specification
         [OF instance_proof n_pos hit before])
   show ?thesis using extends stored by blast
 qed
@@ -1235,14 +1196,12 @@ qed
 text \<open>
 \subsection*{Interpretation of the main theorem}
 
-Let $L$ be the length of a proposed universal certificate. There are
-$2^{L+1}$ prefixes of length $L+1$. For each prefix, choose a complete 
-parity trace that begins with that prefix and leads to the first arrival at $1$.
-The preceding lemma guarantees that its encoding occurs
-in the certificate. Distinct prefixes give distinct completed traces,
-and injectivity gives distinct encodings. Every encoding must have length
-at most $L$ because it occurs inside the certificate. But there are only
-$2^{L+1}-1$ bitstrings of length at most $L$, giving a contradiction.
+The theorem shows that no finite proof can establish universal
+Collatz convergence while satisfying the stated assumptions.
+For any proposed proof, the argument supplies a trajectory
+whose parity trace to its first arrival at $1$ has an encoding
+too long to fit inside that proof. Trace specification requires
+the proof to contain this encoding, giving a contradiction.
 \<close>
 
 theorem no_finite_collatz_proof:
