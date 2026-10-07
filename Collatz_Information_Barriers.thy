@@ -52,9 +52,8 @@ for proof methods that explicitly store the required parity information.
 Suppose a finite proof establishes the Collatz conjecture.
 A counting argument shows that some trajectory's parity trace
 up to its first arrival at $1$ has an encoding longer than
-the proof. Our storage assumption requires the proof to contain that encoding
-as literal data, which is impossible because the encoding is
-longer than the proof.
+the proof. Our storage assumption requires the proof to contain
+that encoding as literal data, which is impossible.
 
 \subsection*{Structure of the formalisation}
 
