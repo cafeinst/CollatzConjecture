@@ -16,7 +16,7 @@ In an earlier paper, \emph{The Collatz $3n+1$ Conjecture is Unprovable}
 to contain arbitrarily large amounts of information about the parity pattern of
 Collatz trajectories, making a finite proof impossible. The present work
 formalises that idea in Isabelle/HOL. Under explicit assumptions about how 
-proofs store parity information, we prove that no finite proof satisfying those 
+proofs store exact affine parameters, we prove that no finite proof satisfying those 
 assumptions can establish universal Collatz convergence. This yields a machine-checked 
 information-theoretic barrier theorem inspired by the earlier argument.
 
@@ -45,15 +45,17 @@ and comments, and helping diagnose or structure Isabelle/HOL proof scripts.
 \subsection*{Main goal}
 
 The present development establishes an information-theoretic barrier
-for proof methods that explicitly store the required parity information.
+for proof methods that explicitly store the affine parameters associated
+with each trajectory's first arrival at $1$.
 
 \subsection*{High-level strategy}
 
-Suppose a finite proof establishes the Collatz conjecture.
-A counting argument shows that some trajectory's parity trace
-up to its first arrival at $1$ has an encoding longer than
-the proof. Our storage assumption requires the proof to contain
-that encoding as literal data, which is impossible.
+Suppose a finite proof establishes the Collatz conjecture
+and contains an encoding of each trajectory's exact affine
+parameters at its first arrival at $1$. Distinct parity traces
+give distinct parameter encodings. A counting argument shows
+that one of these encodings must be longer than the proof,
+so it cannot fit inside it.
 
 \subsection*{Structure of the formalisation}
 
@@ -65,7 +67,7 @@ computational traces of the iterative process.
 
 \item[2. Affine formula characterisation]
 We establish the affine representation $(3^s n+c)/2^k$ and
-prove that, for fixed $k$, its parameters uniquely determine
+prove that the exact triple $(k,s,c)$ uniquely determines
 the parity vector.
 
 \item[3. Two--adic invariance]
@@ -75,16 +77,16 @@ construction.
 
 \item[4. Every parity vector is realisable]
 We prove that every finite binary string occurs as the parity vector of some
-starting value. This shows that arbitrarily complex computational traces are
-inherent to the Collatz dynamics.
+starting value. We also construct trajectories that retain any chosen
+initial pattern before their first arrival at $1$, if they reach $1$.
 
 \item[5. Proof system setup]
 We model proofs as bitstrings and state assumptions about
-soundness, parity encoding, and explicit trace storage.
+soundness, parameter encoding, and explicit storage of affine parameters.
 
-\item[6. The original information--barrier argument]
-We formalise the original information--theoretic argument for the
-Collatz conjecture, with its proof--system requirements stated explicitly.
+\item[6. The information--barrier theorem]
+We combine affine injectivity, parity realisability, and counting
+to rule out a finite universal proof satisfying the storage assumptions.
 
 \end{description}
 \<close>
@@ -274,6 +276,16 @@ proof -
     using assms(1,2) by simp
   show ?thesis
     by (rule params0_injective_len[OF L P])
+qed
+
+lemma formula_of_injective: "inj formula_of"
+proof (rule injI)
+  fix x y
+  assume F: "formula_of x = formula_of y"
+  have L: "length x = length y"
+    using F by (simp add: formula_of_def)
+  show "x = y"
+    by (rule formula_determines_parity_on_len[OF refl L[symmetric] F])
 qed
 
 section \<open>Two-adic invariance\<close>
@@ -889,18 +901,11 @@ text \<open>
 \subsection*{Substring containment}
 
 We introduce a substring-containment relation as a \emph{concrete and explicit}
-model of proofs that store computational trace information as literal data.
+model of proofs that store encoded affine parameters as literal data.
 Formally, a bitstring $p$ contains a bitstring $s$ if $s$ occurs verbatim as a
 contiguous substring of $p$, i.e.\ if there exist bitstrings $u$ and $v$ such
 that $p = u @ s @ v$.
-
-\paragraph{Remark.}
-Substring containment gives a precise model of explicit trace storage:
-the proof must contain the encoding as literal data, so the encoding
-cannot be longer than the proof. Different parity traces have different
-encodings by injectivity. The main theorem counts these encodings
-directly, without requiring the encoding of a prefix to be a prefix
-of the encoding of the full trace.\<close>
+\<close>
 
 definition contains :: "bitstring \<Rightarrow> bitstring \<Rightarrow> bool"
   where "contains p s \<longleftrightarrow> (\<exists>u v. p = u @ s @ v)"
@@ -998,39 +1003,36 @@ A bitstring $p$ represents a proposed proof.
 If $p$ proves that a positive integer $n$ reaches $1$,
 then there exists an $r$ such that $T^{(r)}(n)=1$.
 
-\item \textbf{Trace specification.}
+\item \textbf{Affine-parameter specification.}
 If $p$ proves that a positive integer $n$ reaches $1$, and $r$
 is the first step at which it does so, then $p$ contains an
-encoding of the parity trace leading to that first arrival.
-Explicitly, if
+encoding of the exact affine triple $(r,s,c)$ associated with
+those $r$ steps. These parameters satisfy
 \[
-T^{(r)}(n)=1
-\quad\text{and}\quad
-T^{(j)}(n)>1 \text{ for every }j<r,
+T^{(r)}(n)=\frac{3^s n+c}{2^r}=1,
 \]
-then $p$ contains an encoding of
-\[
-(n,T(n),\ldots,T^{(r-1)}(n))\pmod 2.
-\]
-For $r=0$, this trace is empty.
+where $s$ counts the odd steps and $c$ depends on their positions.
+Here $(r,s,c)$ is the exact triple determined by the trajectory's
+parity vector. For $r=0$, the triple is $(0,0,0)$.
 
-\item \textbf{Injectivity of the parity encoding.}
-Different parity traces have different encodings.
+\item \textbf{Injectivity of the parameter encoding.}
+Different parameter triples have different encodings.
 
 \item \textbf{Universal instantiation.}
 If $p$ proves the Collatz conjecture, then for every positive $n$
-the same certificate $p$ proves the instance
+the same proof $p$ proves the instance
 \[
 \exists r.\ T^{(r)}(n)=1.
 \]
 \end{enumerate}
 
-\subsection*{Motivation for the trace-specification assumption}
+\subsection*{Motivation for the affine-parameter storage assumption}
 
-The trace-specification assumption is motivated by two structural
-properties of the Collatz map.
+The affine-parameter storage assumption is motivated by the
+following contrast between Collatz trajectories and a simple
+decreasing map.
 
-\paragraph{1. Arbitrarily large excursions.}
+\paragraph{Growth above the starting value.}
 The affine representation
 \[
 T^{(k)}(n)=\frac{3^s n+c}{2^k}
@@ -1056,49 +1058,52 @@ For every $n>1$, we have $1 \leq U(n)<n$, regardless of
 whether $n$ is even or odd. Repeated application therefore
 reaches $1$, without requiring an explicit parity trace.
 
-\paragraph{2. Injectivity of the affine representation.}
-In the Collatz affine representation, $s$ counts the odd steps,
-while $c$ depends on their positions. As shown earlier,
-for a fixed trace length $k$, the correspondence between
-parity vectors and their associated affine parameters
-$(s,c)$ is injective.
-
 \bigskip\noindent
-Property 1 rules out the simple step-by-step descent argument
-used for $U$. The affine representation gives the exact formula
-for $T^{(k)}(n)$ associated with its parity vector.
-By property 2, its exact parameters and the parity vector
-determine one another at a fixed trace length.
-We therefore investigate proofs that explicitly store this
-parity information. The trace-specification assumption requires
-the proof certificate to contain the encoded parity trace
-leading to the first arrival at $1$ explicitly. The Isabelle development
-establishes the resulting limitation on such certificates.
+Collatz trajectories can rise arbitrarily far above their
+starting values, so the simple step-by-step descent argument
+used for $U$ does not apply. We investigate proofs that
+explicitly store the exact affine parameters associated
+with each trajectory's first arrival at $1$. The Isabelle
+development establishes the resulting limitation on such proofs.
 \<close>
 
-locale Collatz_Trace_Barrier =
-  fixes enc_parity :: "bool list \<Rightarrow> bitstring"
+locale Collatz_Affine_Barrier =
+  fixes enc_affine :: "nat \<times> nat \<times> nat \<Rightarrow> bitstring"
     and proves_reaches_one :: "bitstring \<Rightarrow> nat \<Rightarrow> bool"
     and is_collatz_proof :: "bitstring \<Rightarrow> bool"
   assumes instance_soundness:
     "\<lbrakk>proves_reaches_one p n; n > 0\<rbrakk>
      \<Longrightarrow> \<exists>r. Tpow r n = 1"
-  assumes trace_specification:
+  assumes affine_specification:
     "\<lbrakk>proves_reaches_one p n;
       n > 0;
       Tpow r n = 1;
       \<forall>j<r. Tpow j n > 1\<rbrakk>
-     \<Longrightarrow> contains p (enc_parity (parity_vec n r))"
-  assumes enc_parity_injective: "inj enc_parity"   
+     \<Longrightarrow>
+       contains p (enc_affine (formula_of (parity_vec n r)))"
+  assumes enc_affine_injective: "inj enc_affine"   
   assumes collatz_proof_instances:
     "is_collatz_proof p \<Longrightarrow>
        \<forall>n>0. proves_reaches_one p n"
 begin
 
+abbreviation enc_trace :: "bool list \<Rightarrow> bitstring" where
+  "enc_trace x \<equiv> enc_affine (formula_of x)"
+
+lemma enc_trace_injective: "inj enc_trace"
+proof (rule injI)
+  fix x y
+  assume E: "enc_trace x = enc_trace y"
+  have F: "formula_of x = formula_of y"
+    using enc_affine_injective E by (rule injD)
+  show "x = y"
+    using formula_of_injective F by (rule injD)
+qed
+
 lemma stored_first_hit_extension:
   assumes p_proof: "is_collatz_proof p"
     and x_len: "length x = Suc L"
-  shows "\<exists>y. take (Suc L) y = x \<and> contains p (enc_parity y)"
+  shows "\<exists>y. take (Suc L) y = x \<and> contains p (enc_trace y)"
 proof -
   obtain n where
     n_pos: "n > 0" and
@@ -1119,8 +1124,8 @@ proof -
   have prefix_length: "Suc L \<le> r" using r_gt by simp
   have extends: "take (Suc L) (parity_vec n r) = x"
     using parity_vec_take_prefix[OF prefix_length, of n] prefix by simp
-  have stored: "contains p (enc_parity (parity_vec n r))"
-    by (rule trace_specification
+  have stored: "contains p (enc_trace (parity_vec n r))"
+    by (rule affine_specification
         [OF instance_proof n_pos hit before])
   show ?thesis using extends stored by blast
 qed
@@ -1130,10 +1135,11 @@ text \<open>
 
 The theorem shows that no finite proof can establish universal
 Collatz convergence while satisfying the stated assumptions.
-For any proposed proof, the argument supplies a trajectory
-whose parity trace to its first arrival at $1$ has an encoding
-too long to fit inside that proof. Trace specification requires
-the proof to contain this encoding, giving a contradiction.
+For a proposed universal proof, the argument produces a trajectory
+whose exact affine parameters at its first arrival at $1$ have
+an encoding too long to fit inside that proof.
+The storage assumption requires the proof to contain this
+encoding, giving a contradiction.
 \<close>
 
 theorem no_finite_collatz_proof:
@@ -1146,27 +1152,27 @@ proof -
 
   define f :: "bitstring \<Rightarrow> bitstring" where
     "f x = (SOME y. take (Suc ?L) y = x \<and>
-                       contains p (enc_parity y))" for x
+                       contains p (enc_trace y))" for x
 
   have f_properties:
-    "take (Suc ?L) (f x) = x \<and> contains p (enc_parity (f x))"
+    "take (Suc ?L) (f x) = x \<and> contains p (enc_trace (f x))"
     if x_in: "x \<in> ?S" for x
   proof -
     have x_len: "length x = Suc ?L" using x_in by simp
     have exists_extension:
-      "\<exists>y. take (Suc ?L) y = x \<and> contains p (enc_parity y)"
+      "\<exists>y. take (Suc ?L) y = x \<and> contains p (enc_trace y)"
       by (rule stored_first_hit_extension[OF p_proof x_len])
     show ?thesis
       unfolding f_def by (rule someI_ex[OF exists_extension])
   qed
 
-  have enc_f_inj: "inj_on (\<lambda>x. enc_parity (f x)) ?S"
+  have enc_f_inj: "inj_on (\<lambda>x. enc_trace (f x)) ?S"
   proof (rule inj_onI)
     fix x y
     assume x_in: "x \<in> ?S" and y_in: "y \<in> ?S"
-      and equal_enc: "enc_parity (f x) = enc_parity (f y)"
+      and equal_enc: "enc_trace (f x) = enc_trace (f y)"
     have equal_traces: "f x = f y"
-      using enc_parity_injective equal_enc by (rule injD)
+      using enc_trace_injective equal_enc by (rule injD)
     have x_prefix: "take (Suc ?L) (f x) = x"
       using f_properties[OF x_in] by blast
     have y_prefix: "take (Suc ?L) (f y) = y"
@@ -1175,15 +1181,15 @@ proof -
   qed
 
   have encodings_fit:
-    "(\<lambda>x. enc_parity (f x)) ` ?S \<subseteq> ?B"
+    "(\<lambda>x. enc_trace (f x)) ` ?S \<subseteq> ?B"
   proof
     fix z
-    assume "z \<in> (\<lambda>x. enc_parity (f x)) ` ?S"
+    assume "z \<in> (\<lambda>x. enc_trace (f x)) ` ?S"
     then obtain x where x_in: "x \<in> ?S"
-      and z_eq: "z = enc_parity (f x)" by blast
-    have stored: "contains p (enc_parity (f x))"
+      and z_eq: "z = enc_trace (f x)" by blast
+    have stored: "contains p (enc_trace (f x))"
       using f_properties[OF x_in] by blast
-    have "length (enc_parity (f x)) \<le> length p"
+    have "length (enc_trace (f x)) \<le> length p"
       by (rule contains_len_bound[OF stored])
     then show "z \<in> ?B" by (simp add: z_eq)
   qed
@@ -1191,10 +1197,10 @@ proof -
   have finite_B: "finite ?B"
     by (rule finite_bitstrings_le_len)
   have image_bound:
-    "card ((\<lambda>x. enc_parity (f x)) ` ?S) \<le> card ?B"
+    "card ((\<lambda>x. enc_trace (f x)) ` ?S) \<le> card ?B"
     by (rule card_mono[OF finite_B encodings_fit])
   have image_card:
-    "card ((\<lambda>x. enc_parity (f x)) ` ?S) = card ?S"
+    "card ((\<lambda>x. enc_trace (f x)) ` ?S) = card ?S"
     by (rule card_image[OF enc_f_inj])
   have source_card: "card ?S = 2 ^ Suc ?L"
     by (rule many_strings_of_length)
