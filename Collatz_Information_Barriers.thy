@@ -31,22 +31,10 @@ arXiv:math/0312309; \emph{Global Journal of Science Frontier Research},
 Mathematics and Decision Sciences, Volume 12, Issue 8 (2012), 13--15.
 \end{quote}
 
-\noindent The assumptions required for that argument are made explicit and
-formalised within Isabelle/HOL, yielding a machine-checked
-conditional theorem showing that no finite proof can exist
-within the corresponding class of proof systems. 
-These assumptions are motivated by structural properties of the Collatz map.
-
 The author of this formalisation received assistance from two AI systems ---
 ChatGPT (OpenAI) and Claude (Anthropic). Their assistance consisted of drafting
 and refining explanatory text, improving the readability of the introduction
 and comments, and helping diagnose or structure Isabelle/HOL proof scripts.
-
-\subsection*{Main goal}
-
-The present development establishes an information-theoretic barrier
-for proof methods that explicitly store the affine parameters associated
-with each trajectory's first arrival at $1$.
 
 \subsection*{High-level strategy}
 
@@ -212,17 +200,10 @@ next
   show ?case by (cases b) (simp_all add: P S id_def)
 qed
 
-lemma params0_two_odd_steps:
-  "params0 [True, True] = (5, 2)"
-  by simp
-
 text \<open>
 \subsection*{Injectivity}
-Different parity vectors produce distinct triples $(k,s,c)$ in the
-representation
-\[
-T^{(k)}(n) = \frac{3^s \cdot n + c}{2^k}.
-\]
+Different parity vectors produce distinct affine parameter
+triples $(k,s,c)$.
 \<close>
 
 lemma params0_injective_len:
@@ -473,8 +454,6 @@ sequence agrees with $x$:
 \[
 \forall x.\ \exists n.\ \textit{parity\_vec}\ n\ (\text{length } x) = x.
 \]
-
-\noindent Thus, every finite parity pattern occurs for some starting value. 
 \<close>
 
 text \<open>
@@ -1059,12 +1038,10 @@ whether $n$ is even or odd. Repeated application therefore
 reaches $1$, without requiring an explicit parity trace.
 
 \bigskip\noindent
-Collatz trajectories can rise arbitrarily far above their
-starting values, so the simple step-by-step descent argument
-used for $U$ does not apply. We investigate proofs that
-explicitly store the exact affine parameters associated
-with each trajectory's first arrival at $1$. The Isabelle
-development establishes the resulting limitation on such proofs.
+The simple step-by-step descent argument used for $U$
+therefore does not apply to the Collatz map. We investigate
+proofs that contain encodings of the exact affine parameters
+associated with each trajectory's first arrival at $1$.
 \<close>
 
 locale Collatz_Affine_Barrier =
